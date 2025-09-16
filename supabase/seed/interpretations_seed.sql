@@ -1,0 +1,65 @@
+-- Minimal seed: 48 schede (12 Sun in sign, 12 Moon in house, 12 Mercury in house, 12 transits examples)
+
+
+-- SUN in SIGNS (12)
+insert into public.interpretations (type, key, title, summary, tips) values
+('planet_in_sign','sun_in_aries','Sun in Aries','Vitality aims at initiative and direct action. You thrive when you start things and move first.','["Begin a small challenge today","Act before overthinking","Channel energy into exercise"]'),
+('planet_in_sign','sun_in_taurus','Sun in Taurus','Steady growth, comfort and tangible results. You build slowly but surely.','["Commit to one practical step","Declutter one small area","Cook a grounding meal"]'),
+('planet_in_sign','sun_in_gemini','Sun in Gemini','Curiosity, variety and communication fuel you. Learning keeps you alive.','["Write a short note or post","Call someone and share ideas","Test a new tool for 10 minutes"]'),
+('planet_in_sign','sun_in_cancer','Sun in Cancer','Care, memory and emotional safety guide your drive. Home base matters.','["Tend to a personal space","Cook or share comfort food","Reach out to a trusted friend"]'),
+('planet_in_sign','sun_in_leo','Sun in Leo','Creative expression and heart‑led courage. Being seen lights you up.','["Showcase a small work","Offer genuine praise","Add play to one task"]'),
+('planet_in_sign','sun_in_virgo','Sun in Virgo','Refinement, service and useful details. You improve systems.','["Tidy a workflow (10 min)","Ship a small fix","List top 3 priorities"]'),
+('planet_in_sign','sun_in_libra','Sun in Libra','Balance, aesthetics and fair exchange. You shine with partners.','["Invite feedback kindly","Beautify a corner","Broker a win‑win"]'),
+('planet_in_sign','sun_in_scorpio','Sun in Scorpio','Depth, focus and transformation. You renew by going beneath the surface.','["Protect quiet focus time","Release one draining habit","Journal a fear → next step"]'),
+('planet_in_sign','sun_in_sagittarius','Sun in Sagittarius','Meaning, exploration and optimism. Aim the arrow beyond the usual.','["Read 5 pages on a big idea","Take a longer walk","Plan a micro‑adventure"]'),
+('planet_in_sign','sun_in_capricorn','Sun in Capricorn','Structure, mastery and long‑term goals. You build what lasts.','["Define one metric","Block 25 minutes deep work","Say no to a distraction"]'),
+('planet_in_sign','sun_in_aquarius','Sun in Aquarius','Originality, networks and future thinking. You thrive on systems and people.','["Share a helpful resource","Automate a tiny task","DM someone you admire"]'),
+('planet_in_sign','sun_in_pisces','Sun in Pisces','Imagination, empathy and flow. You sense connections others miss.','["5 minutes of breathwork","Add music to a task","Sketch a dream idea"]');
+
+
+-- MOON in HOUSES (12)
+insert into public.interpretations (type, key, title, summary, tips) values
+('planet_in_house','moon_house_1','Moon in House I','Feelings show on the surface; moods start the day.','["Name your mood","Keep morning simple","Hydrate early"]'),
+('planet_in_house','moon_house_2','Moon in House II','Emotional security links to resources and values.','["Check one expense","Cook at home","List 3 non‑negotiables"]'),
+('planet_in_house','moon_house_3','Moon in House III','Daily exchanges shape mood; siblings/neighbors matter.','["Send a kind message","Walk your block","Read 10 minutes"]'),
+('planet_in_house','moon_house_4','Moon in House IV','Home and roots restore you.','["Tidy a room corner","Ask about family story","Rest earlier"]'),
+('planet_in_house','moon_house_5','Moon in House V','Play, romance and creativity feed the heart.','["Do a 10‑min hobby","Write a compliment","Dance to one song"]'),
+('planet_in_house','moon_house_6','Moon in House VI','Routines and service stabilize emotions.','["Prep a simple meal","Stretch 5 minutes","Finish a small chore"]'),
+('planet_in_house','moon_house_7','Moon in House VII','Partners and mirroring moods teach balance.','["Listen without fixing","Plan a shared micro‑ritual","Express one need"]'),
+('planet_in_house','moon_house_8','Moon in House VIII','Shared resources and deep bonds stir feelings.','["Review one subscription","Journal a fear→fact","Safeguard a password"]'),
+('planet_in_house','moon_house_9','Moon in House IX','Beliefs and far horizons lift spirits.','["Learn a worldview snippet","Explore a map","Say yes to a new idea"]'),
+('planet_in_house','moon_house_10','Moon in House X','Visibility and role affect mood.','["Define today’s win","Polish a profile line","Celebrate a micro‑result"]'),
+('planet_in_house','moon_house_11','Moon in House XI','Friends and causes nurture you.','["Post a helpful tip","Thank a collaborator","Join a community thread"]'),
+('planet_in_house','moon_house_12','Moon in House XII','Solitude and inner life soothe.','["Mute notifications 20m","Write a worry→action","Rest without screens"]');
+
+
+-- MERCURY in HOUSES (12)
+insert into public.interpretations (type, key, title, summary, tips) values
+('planet_in_house','mercury_house_1','Mercury in House I','Quick mind; you lead with words and ideas.','["Draft a 2‑sentence bio","Outline before writing","Ask one smart question"]'),
+('planet_in_house','mercury_house_2','Mercury in House II','Thinking about value, skills and income.','["Note one marketable skill","Track a micro‑expense","Pitch a tiny service"]'),
+('planet_in_house','mercury_house_3','Mercury in House III','Curious messenger; short trips, siblings, notes.','["Try a new note method","Walk & record a thought","Reply to one email well"]'),
+('planet_in_house','mercury_house_4','Mercury in House IV','Family stories and home logistics.','["Label a box","Map a home task","Call a relative"]'),
+('planet_in_house','mercury_house_5','Mercury in House V','Creative mind and witty play.','["Brainstorm 10 ideas","Write a limerick","Explain a concept simply"]'),
+('planet_in_house','mercury_house_6','Mercury in House VI','Process thinker; systems and health routines.','["Template a checklist","Rename files clearly","Schedule admin block"]'),
+('planet_in_house','mercury_house_7','Mercury in House VII','Dialog and negotiation skills.','["Mirror back what you heard","Draft a simple contract","Clarify expectations"]'),
+('planet_in_house','mercury_house_8','Mercury in House VIII','Research mind; shared finances, psychology.','["Read a summary on a taboo topic","Review a shared bill","Use a password manager"]'),
+('planet_in_house','mercury_house_9','Mercury in House IX','Philosophy, teaching and publishing.','["Write a thread outline","Teach one idea to a friend","Skim a research abstract"]'),
+('planet_in_house','mercury_house_10','Mercury in House X','Career communication and strategy.','["Update a headline","Draft next-step email","Define success metric"]'),
+('planet_in_house','mercury_house_11','Mercury in House XI','Networks, groups and future plans.','["Map 3 contacts","Share a resource","Set a quarterly theme"]'),
+('planet_in_house','mercury_house_12','Mercury in House XII','Inner dialogue, analysis in quiet.','["Morning pages 5 min","Name a limiting story","Plan a rest ritual"]');
+
+
+-- TRANSIT → NATAL (12 examples)
+insert into public.interpretations (type, key, title, summary, tips) values
+('transit_to_nat','tr_sun_conj_moon','Transit Sun conjunct natal Moon','Daily spotlight meets feelings: clarity about needs.','["Name the top need today","Share it gently","Protect energy early"]'),
+('transit_to_nat','tr_venus_trine_sun','Transit Venus trine natal Sun','Ease in connections and taste; pleasant flow for expression.','["Plan a social coffee","Tweak a design detail","Offer appreciation"]'),
+('transit_to_nat','tr_mars_square_moon','Transit Mars square natal Moon','Irritability possible; act, don’t react.','["Move your body 10 min","Count to 10 before replying","Channel into a task"]'),
+('transit_to_nat','tr_mercury_sextile_mc','Transit Mercury sextile natal MC','Useful news for career/role; small wins via message.','["Send a concise update","Polish one slide","Follow up on a lead"]'),
+('transit_to_nat','tr_jupiter_trine_asc','Transit Jupiter trine natal ASC','Confidence and support expand; helpful allies appear.','["Ask for intro","Schedule growth task","Celebrate a small luck"]'),
+('transit_to_nat','tr_saturn_opposition_sun','Transit Saturn opposite natal Sun','Reality check and responsibility; long‑term focus.','["Define a boundary","Commit to a schedule","Remove one distraction"]'),
+('transit_to_nat','tr_uranus_square_venus','Transit Uranus square natal Venus','Surprises in taste/relationships; update patterns.','["Try a fresh style","Plan a novelty date","Unsubscribe from clutter"]'),
+('transit_to_nat','tr_neptune_trine_moon','Transit Neptune trine natal Moon','Soft imagination and empathy; rest supports insight.','["Short meditation","Art playlist","Dream journal note"]'),
+('transit_to_nat','tr_pluto_conj_mc','Transit Pluto conjunct natal MC','Powerful career transformation; go deep and strategic.','["Audit your goals","Protect reputation","Find a mentor"]'),
+('transit_to_nat','tr_mars_sextile_mercury','Transit Mars sextile natal Mercury','Quick action + clear words; ship small decisions.','["Timebox a task","Send decisive email","Avoid doomscrolling"]'),
+('transit_to_nat','tr_sun_square_saturn','Transit Sun square natal Saturn','Friction shows limits → structure helps.','["Break task into 3","Ask for clarity","Rest on time"]'),
+('transit_to_nat','tr_venus_opposition_mars','Transit Venus opposite natal Mars','Attraction vs. assertion dynamics; balance charm and drive.','["Plan a fair compromise","Compliment + ask","Cool down before reacting"]');
