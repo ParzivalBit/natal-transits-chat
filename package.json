@@ -1,1 +1,41 @@
-{"name":"natal-transits-chat","version":"0.1.0","private":true,"scripts":{"dev":"next dev","build":"next build","start":"next start","lint":"next lint"},"dependencies":{"@supabase/ssr":"^0.4.1","@supabase/supabase-js":"^2.57.4","astronomy-engine":"^2.1.19","geo-tz":"^7.0.7","luxon":"^3.7.2","next":"14.2.10","openai":"^5.20.3","react":"18.2.0","react-dom":"18.2.0","stripe":"^14.24.0","tz-lookup":"^6.1.25","zod":"^3.23.8"},"devDependencies":{"@types/luxon":"^3.7.1","@types/node":"^20.19.15","@types/react":"^18.3.24","@types/react-dom":"^18.3.7","autoprefixer":"^10.4.21","eslint":"^8.57.0","eslint-config-next":"14.2.10","postcss":"^8.5.6","tailwindcss":"^3.4.17","typescript":"^5.6.2"}}
+{
+  "name": "natal-transits-chat",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "export:kb": "node scripts/export-kb.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.4.1",
+    "@supabase/supabase-js": "^2.57.4",
+    "astronomy-engine": "^2.1.19",
+    "geo-tz": "^7.0.7",
+    "gh": "^2.8.9",
+    "luxon": "^3.7.2",
+    "next": "14.2.10",
+    "openai": "^5.20.3",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "stripe": "^14.24.0",
+    "swr": "^2.3.6",
+    "tz-lookup": "^6.1.25",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.1",
+    "@types/node": "^20.19.15",
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.10",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.6.2"
+  },
+  "type": "module"
+}
