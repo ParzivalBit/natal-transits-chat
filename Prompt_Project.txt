@@ -1,0 +1,78 @@
+Perfetto — ho letto i file della codebase e lo schema DB. Ecco la ricognizione (10–15 righe) su come Placidus si innesta nell’architettura attuale:
+
+Il motore astrologico è in src/lib/astro.ts: calcola posizioni geocentriche eclittiche con astronomy-engine (MIT), ASC/MC e assegna le case Whole Sign in base al segno dell’Ascendente; ritorna points + flag houses. L’assegnazione attuale è “per segno” (indice del segno del punto meno indice del segno dell’ASC).
+
+Le API per comporre e salvare la carta sono in /app/api/chart/compute/route.ts: normalizza input, stima offset TZ, chiama computePoints, calcola aspetti e persiste in birth_data, chart_points e natal_aspects. Al momento non salva nulla in house_cusps.
+
+La pagina Natal legge chart_points e renderizza il wheel; l’header è esplicito: “Natal Chart (Whole Sign)”, quindi il rendering oggi è legato al sistema WS.
+
+Il componente ChartWheel riceve solo i punti (con house già assegnata), non riceve ancora cuspidi; potrà essere esteso per disegnare le cuspidi Placidus.
+
+La chat costruisce il contesto leggendo chart_points (nome, segno, house, retro); non include ancora il sistema di case né le cuspidi.
+
+La pipeline transiti è runtime (lib/transits.ts e /api/transits), indipendente dal sistema di case; il Daily usa preferenze utente correnti.
+
+Nel DB esiste già user_prefs.house_system con default 'whole', ed esiste la tabella house_cusps (righe: user_id, system, cusp 1..12, longitude). Sono pronti per Placidus senza nuove migrazioni.
+
+Lo Overview conferma: da fare l’estensione del motore per calcolare cuspidi Placidus e assegnare le case, persistendo in chart_points.house e house_cusps.
+
+La route /app/api/user/prefs/route.ts oggi gestisce posizione/TZ, ma non espone ancora un update per house_system (che c’è in tabella): lo aggiungeremo.
+
+ASC/MC oggi sono calcolati già in astro.ts (ASC per ricerca sull’orizzonte, MC dal LST/obliquità): riuseremo queste basi anche per Placidus.
+
+Piano operativo proposto (allineato alla repo)
+
+Step 1 — API & firme (design)
+
+Nuovo modulo src/lib/houses/placidus.ts con:
+computePlacidusCusps(jd, latDeg, lonDeg, tzMinutes): { system:'placidus'; cusps:number[12]; asc:number; mc:number } (gradi eclittici 0–360).
+
+Funzione separata assignHouses(longitudeDeg, cusps): 1..12 che gestisce wrap-around 360°.
+
+Chiariremo che jd è JD UT; calcoleremo GST/LST per il luogo partendo dall’istante UTC.
+
+Gestione errori per |lat|>~66.5° con fallback a Whole Sign (e flag per UI).
+
+Step 2 — Matematica Placidus (implementazione)
+
+In placidus.ts: obliquità (da astronomy-engine o formula), GST/LST, MC (long. eclittica del meridiano superiore), ASC (intersezione orizzonte-eclittica), cuspidi via metodo dei semi-archi con divisioni temporali; case opposte 4–9 derivate.
+
+Utility numeriche (normalize/deg↔rad/atan2 safe) e test interni.
+
+Step 3 — Colla di integrazione
+
+Nuovo src/lib/houses/common.ts (util).
+
+Estendere src/lib/astro.ts con una factory computeHouses(system, { jd, latDeg, lonDeg, tzMinutes }) che delega a Whole/Placidus.
+
+Aggiornare la logica di assegnazione house per i pianeti quando generiamo chart_points.
+
+Step 4 — Persistenza (natal)
+
+In /app/api/chart/compute/route.ts: leggere user_prefs.house_system (default 'whole'), calcolare cuspidi via computeHouses, upsert di 12 righe in house_cusps (system, cusp, longitude), popolamento chart_points.house con assignHouses. Nessuna migrazione.
+
+Step 5 — Daily (runtime)
+
+Nel loader della pagina Daily: leggere user_prefs (incluso house_system), calcolare cuspidi runtime (senza persistenza) e passarle al renderer (SkyWheel/ChartWheel) insieme ai transiti.
+
+Step 6 — UI toggle Whole↔Placidus
+
+Aggiungere uno switch nella stessa pagina (Natal e Daily) con override locale + update opzionale di user_prefs.house_system via endpoint dedicato.
+
+In Natal: pulsante “Ricalcola con Placidus” che richiama /api/chart/compute.
+
+Step 7 — Chatbot context
+
+In /app/api/chat/route.ts aggiungere una riga HOUSE_SYSTEM: ... e, facoltativo, dump compatto delle 12 cuspidi in gradi/segni.
+
+Step 8 — QA & fallback
+
+3 benchmark (date/ore/luoghi) con tolleranza ±1° rispetto a un calcolatore affidabile; test per latitudini >66.5° con fallback a Whole + avviso UI.
+
+Verifica performance (<150ms su calcolo case server-side, escluso I/O DB).
+
+Step 9 — Docs
+
+Sezione “House Systems” in PROJECT_OVERVIEW.md: architettura, limiti, fallback, licenze.
+
+Se ti va, conferma che posso procedere con Step 1 (design delle firme + contratti TypeScript). Al prossimo messaggio ti fornisco i file completi da incollare (paths esatti) e le note di test.

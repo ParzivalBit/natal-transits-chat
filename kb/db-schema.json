@@ -1,0 +1,790 @@
+{
+      "schemas": [
+        {
+          "name": "public",
+          "tables": [
+            {
+              "name": "birth_data",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "bigint",
+                  "default": "nextval('birth_data_id_seq'::regclass)",
+                  "nullable": false
+                },
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "name",
+                  "type": "text",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "date",
+                  "type": "date",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "time",
+                  "type": "time without time zone",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "tz_offset_minutes",
+                  "type": "integer",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "place_name",
+                  "type": "text",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "lat",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "lon",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "birth_data_user_id_fkey",
+                  "columns": [
+                    "user_id"
+                  ],
+                  "ref_table": "auth.users",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "chart_points",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "bigint",
+                  "default": "nextval('chart_points_id_seq'::regclass)",
+                  "nullable": false
+                },
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "kind",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "name",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "longitude",
+                  "type": "numeric(7,3)",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "sign",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "house",
+                  "type": "integer",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "retro",
+                  "type": "boolean",
+                  "default": "false",
+                  "nullable": true
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": []
+            },
+            {
+              "name": "chat_messages",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "bigint",
+                  "default": "nextval('chat_messages_id_seq'::regclass)",
+                  "nullable": false
+                },
+                {
+                  "name": "session_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "role",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "content",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "chat_messages_session_id_fkey",
+                  "columns": [
+                    "session_id"
+                  ],
+                  "ref_table": "public.chat_sessions",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "chat_sessions",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "uuid",
+                  "default": "gen_random_uuid()",
+                  "nullable": false
+                },
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": []
+            },
+            {
+              "name": "house_cusps",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "uuid",
+                  "default": "gen_random_uuid()",
+                  "nullable": false
+                },
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "system",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "cusp",
+                  "type": "integer",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "longitude",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "house_cusps_user_id_fkey",
+                  "columns": [
+                    "user_id"
+                  ],
+                  "ref_table": "auth.users",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "interpretations",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "bigint",
+                  "default": "nextval('interpretations_id_seq'::regclass)",
+                  "nullable": false
+                },
+                {
+                  "name": "type",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "key",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "title",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "summary",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "tips",
+                  "type": "jsonb",
+                  "default": "'[]'::jsonb",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": []
+            },
+            {
+              "name": "natal_aspects",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "bigint",
+                  "default": "nextval('natal_aspects_id_seq'::regclass)",
+                  "nullable": false
+                },
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "p1",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "p2",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "aspect",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "orb",
+                  "type": "numeric(5,2)",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "strength",
+                  "type": "numeric(6,2)",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": []
+            },
+            {
+              "name": "people",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "uuid",
+                  "default": "gen_random_uuid()",
+                  "nullable": false
+                },
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "label",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "birth_date",
+                  "type": "date",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "birth_time",
+                  "type": "time without time zone",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "birth_tz_name",
+                  "type": "text",
+                  "default": "'UTC'::text",
+                  "nullable": false
+                },
+                {
+                  "name": "birth_tz_offset_minutes",
+                  "type": "integer",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "birth_place_name",
+                  "type": "text",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "birth_lat",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "birth_lon",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "people_user_id_fkey",
+                  "columns": [
+                    "user_id"
+                  ],
+                  "ref_table": "auth.users",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "people_chart_points",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "bigint",
+                  "default": "nextval('people_chart_points_id_seq'::regclass)",
+                  "nullable": false
+                },
+                {
+                  "name": "person_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "name",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "longitude",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "sign",
+                  "type": "text",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "house",
+                  "type": "integer",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "retro",
+                  "type": "boolean",
+                  "default": "false",
+                  "nullable": false
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "people_chart_points_person_id_fkey",
+                  "columns": [
+                    "person_id"
+                  ],
+                  "ref_table": "public.people",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "people_natal_aspects",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "bigint",
+                  "default": "nextval('people_natal_aspects_id_seq'::regclass)",
+                  "nullable": false
+                },
+                {
+                  "name": "person_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "p1",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "p2",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "aspect",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "orb",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "strength",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "people_natal_aspects_person_id_fkey",
+                  "columns": [
+                    "person_id"
+                  ],
+                  "ref_table": "public.people",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "transit_events",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "bigint",
+                  "default": "nextval('transit_events_id_seq'::regclass)",
+                  "nullable": false
+                },
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "date",
+                  "type": "date",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "t_planet",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "n_point",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "aspect",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "orb",
+                  "type": "numeric(5,2)",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "score",
+                  "type": "numeric(7,3)",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": []
+            },
+            {
+              "name": "user_birth_data",
+              "columns": [
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "birth_datetime_utc",
+                  "type": "timestamp with time zone",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "latitude",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "longitude",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                },
+                {
+                  "name": "updated_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "user_id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "user_birth_data_user_id_fkey",
+                  "columns": [
+                    "user_id"
+                  ],
+                  "ref_table": "auth.users",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "user_prefs",
+              "columns": [
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "current_place_name",
+                  "type": "text",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "current_lat",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "current_lon",
+                  "type": "double precision",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "current_tz_name",
+                  "type": "text",
+                  "default": null,
+                  "nullable": true
+                },
+                {
+                  "name": "updated_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": true
+                },
+                {
+                  "name": "house_system",
+                  "type": "text",
+                  "default": "'whole'::text",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "user_id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "user_prefs_user_id_fkey",
+                  "columns": [
+                    "user_id"
+                  ],
+                  "ref_table": "auth.users",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }

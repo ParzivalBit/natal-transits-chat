@@ -13,11 +13,19 @@ type ChartPoint = {
   retro: boolean;
 };
 
-// Carichiamo i componenti client solo lato client (no SSR) per evitare mismatch
-const ChartWheel = dynamicImport<{ points: ChartPoint[] }>(
-  () => import('@/components/ChartWheel'),
-  { ssr: false }
-);
+// Carichiamo i componenti lato client
+const ChartWheel = dynamicImport<{
+  points: ChartPoint[];
+  houseCusps?: number[];
+  mcDeg?: number;
+  orientation?: 'by-asc' | 'by-mc';
+  direction?: 'cw' | 'ccw';
+  showHouseNumbers?: boolean;
+  showZodiacRing?: boolean;
+  size?: number;
+  className?: string;
+}>(() => import('@/components/ChartWheel'), { ssr: false });
+
 const ChatUI = dynamicImport(() => import('@/components/ChatUI'), { ssr: false });
 
 export default async function Page() {
@@ -25,6 +33,17 @@ export default async function Page() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/onboarding');
 
+  // 1) Preferenza sistema case
+  const { data: prefs } = await supabase
+    .from('user_prefs')
+    .select('house_system')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  const houseSystem: 'whole' | 'placidus' =
+    prefs?.house_system === 'placidus' ? 'placidus' : 'whole';
+
+  // 2) Punti della carta
   const { data: points } = await supabase
     .from('chart_points')
     .select('name,longitude,sign,house,retro')
@@ -33,19 +52,58 @@ export default async function Page() {
 
   const hasPoints = Array.isArray(points) && points.length > 0;
 
+  // 3) Cuspidi per il sistema scelto
+  const { data: cuspsRows } = await supabase
+    .from('house_cusps')
+    .select('cusp, longitude')
+    .eq('user_id', user.id)
+    .eq('system', houseSystem)
+    .order('cusp', { ascending: true });
+
+  const cuspsList: number[] = (cuspsRows ?? []).map(r => Number(r.longitude));
+  const hasCusps = cuspsList.length === 12;
+  const houseCusps: number[] | undefined = hasCusps ? cuspsList : undefined;
+
+  // 4) MC (se serve per orientation='by-mc' o come fallback)
+  const mcPoint = (points ?? []).find(p => p.name === 'MC');
+  const mcDeg: number | undefined = typeof mcPoint?.longitude === 'number'
+    ? mcPoint.longitude
+    : undefined;
+
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       <div className="rounded-2xl border p-4">
-        <h2 className="text-lg font-semibold mb-3">Natal Chart (Whole Sign)</h2>
+        <h2 className="text-lg font-semibold mb-3">
+          Natal Chart ({houseSystem === 'placidus' ? 'Placidus' : 'Whole Sign'})
+        </h2>
+
         {hasPoints ? (
-          <ChartWheel points={points as ChartPoint[]} />
+          <>
+            <ChartWheel
+              points={points as ChartPoint[]}
+              houseCusps={houseCusps}
+              mcDeg={mcDeg}
+              orientation="by-asc"   // ASC a sinistra
+              //direction="cw"         // zodiaco orario (come AstroDienst)
+              showHouseNumbers
+              showZodiacRing
+              size={560}
+            />
+            {!hasCusps && (
+              <p className="mt-3 text-xs text-amber-600">
+                Cuspidi non trovate per <span className="font-semibold">{houseSystem}</span>.
+                Esegui il ricalcolo da <span className="font-medium">Onboarding</span> o fai una POST a <code className="font-mono">/api/chart/compute</code>.
+              </p>
+            )}
+          </>
         ) : (
           <p className="text-sm text-gray-600">
-            Nessun dato. Vai in <span className="font-medium">Onboarding</span> e salva i dati di nascita.
+            Nessun dato. Vai in <span className="font-medium">Onboarding</span> e salva i dati di nascita, poi ricalcola.
           </p>
         )}
+
         <p className="mt-2 text-xs text-gray-500">
-          House system: Whole Sign (MVP). Le case possono differire da sistemi come Placidus.
+          House system: <span className="font-medium">{houseSystem === 'placidus' ? 'Placidus' : 'Whole Sign'}</span>.
         </p>
       </div>
 
