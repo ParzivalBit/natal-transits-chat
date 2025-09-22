@@ -1,0 +1,13 @@
+fetch("/api/chart/compute",{
+  method:"POST",
+  headers:{"content-type":"application/json"},
+  body:JSON.stringify({
+    name:"Natal Placidus",
+    date:"YYYY-MM-DD",
+    time:"HH:MM",
+    place_name:"Città, Paese",
+    lat: /* tuoi */,
+    lon: /* tuoi */,
+    tz_name:"Europe/Rome"
+  })
+}).then(r=>r.json()).then(console.log);

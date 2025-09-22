@@ -1,44 +1,43 @@
 // src/app/dashboard/transits/page.tsx
-import { createSupabaseServerComponentClient } from '@/lib/supabaseServer';
-import TransitsToday from '@/components/TransitsToday';
 import ChatUI from '@/components/ChatUI';
 
 export const dynamic = 'force-dynamic';
 
 function todayUTCISO(): string {
+  // Restituisce la data UTC in formato YYYY-MM-DD
   const d = new Date();
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  const iso = d.toISOString(); // sempre in UTC
+  return iso.slice(0, 10);
 }
 
 export default async function TransitsPage() {
-  const supabase = createSupabaseServerComponentClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return (
-      <div className="text-sm text-gray-600">
-        Devi autenticarti. Vai su <a className="underline" href="/onboarding">Onboarding</a>.
-      </div>
-    );
-  }
-
   const dateUTC = todayUTCISO();
+
+  const ctx = `CONTEXT_TRANSITS_TODAY
+Date: ${dateUTC}
+
+Guidelines:
+- Focus on work/relationships/energy with realistic tips (2–3).
+- Avoid absolutes; wellbeing/entertainment.
+`;
 
   return (
     <div className="grid lg:grid-cols-2 gap-6">
-      <div className="rounded-2xl border p-4">
-        <h2 className="text-lg font-semibold mb-3">Top transits di oggi</h2>
-        <TransitsToday />
-        <p className="mt-2 text-xs text-gray-500">
-          Calcolo giornaliero in UTC. La chat a destra userà la stessa data di questa lista.
+      <div className="rounded-2xl border p-4 min-h-[480px]">
+        <h2 className="text-lg font-semibold mb-3">Transits — Today</h2>
+        <p className="text-sm text-muted-foreground mb-2">
+          Questa vista mostra i transiti di oggi. Usa la chat a destra per chiedere un’interpretazione contestuale.
         </p>
+        {/* Qui puoi eventualmente inserire la lista dei transiti o un calendario */}
+        <div className="text-sm text-muted-foreground">
+          Data (UTC): <span className="font-mono">{dateUTC}</span>
+        </div>
       </div>
 
       <div className="rounded-2xl border p-4 min-h-[480px]">
         <h2 className="text-lg font-semibold mb-3">Ask about today</h2>
-        <ChatUI context={{ view: 'transits', dateUTC }} />
+        {/* ChatUI si aspetta initialContext (string), NON "context" (oggetto) */}
+        <ChatUI initialContext={ctx} />
       </div>
     </div>
   );

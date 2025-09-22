@@ -303,3 +303,50 @@ export function computeNatalAspects(points: Point[]): NatalAspect[] {
   }
   return res;
 }
+
+// ──────────────────────────────── House systems factory ──────────────────────
+import { computePlacidusCusps, assignHouses as assignHousesPlacidus } from '@/lib/houses/placidus';
+import { computeWholeCuspsFromAsc } from '@/lib/houses/whole';
+import { normalizeAngle as _norm } from '@/lib/houses/common';
+
+export type HouseSystem = 'whole' | 'placidus';
+
+/**
+ * Calcola cuspidi/ASC/MC per il sistema scelto (Whole o Placidus).
+ * Inputs:
+ * - jd: Julian Day UT
+ * - latDeg/lonDeg: coordinate geografiche (E+, W-)
+ * - tzMinutes: non usato per il calcolo (coerenza firma)
+ */
+export function computeHouses(
+  system: HouseSystem,
+  args: { jd: number; latDeg: number; lonDeg: number; tzMinutes: number }
+):
+  | { system: 'whole'; cusps: number[]; asc: number; mc: number; fallbackApplied?: boolean }
+  | { system: 'placidus'; cusps: number[]; asc: number; mc: number; fallbackApplied?: boolean } {
+  const { jd, latDeg, lonDeg } = args;
+
+  // Per ASC/MC “whole” possiamo riutilizzare le funzioni esistenti basate su Date;
+  // ricostruiamo Date UTC da JD per coerenza con il resto del file.
+  const when = new Date((jd - 2440587.5) * 86400000);
+
+  if (system === 'placidus') {
+    // Placidus calcola già ASC/MC e le 12 cuspidi
+    return computePlacidusCusps(jd, latDeg, lonDeg);
+  }
+
+  // WHOLE SIGN:
+  const ascDeg = ascendantLongitude(when, latDeg, lonDeg);
+  const mcDeg = midheavenLongitude(when, lonDeg);
+  return computeWholeCuspsFromAsc(ascDeg, mcDeg);
+}
+
+/**
+ * Assegna il numero di casa (1..12) ad un punto dato un set di cuspidi.
+ * Attenzione: per Placidus usiamo la funzione robusta del modulo Placidus (wrap-safe).
+ * Per Whole, le cuspidi sono equispaziate; la regola è identica.
+ */
+export function assignHousesGeneric(longitudeDeg: number, cusps: number[]): number {
+  return assignHousesPlacidus(_norm(longitudeDeg), cusps);
+}
+

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { DateTime } from 'luxon';
 import { createSupabaseServerRouteClient } from '@/lib/supabaseServer';
 import { computePoints, computeNatalAspects, type Point } from '@/lib/astro';
+import { computeHouses, assignHousesGeneric, type HouseSystem } from '@/lib/astro';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,7 +15,7 @@ type BodyIn = {
   place_name?: string | null;
   lat?: number | string | null;
   lon?: number | string | null;
-  tz_name?: string | null;    // es. Europe/Rome (opzionale)
+  tz_name?: string | null;    // es. Europe/Rome (opzionale, usato solo per calcolo offset)
 };
 
 function bad(msg: string, code = 400) {
@@ -36,8 +37,8 @@ function offsetMinutes(date: string | null, time: string | null, tz: string | nu
 }
 
 /** planet | angle in base al nome del punto */
-function pointKind(p: Point): 'planet' | 'angle' {
-  return p.name === 'ASC' || p.name === 'MC' ? 'angle' : 'planet';
+function pointKind(name: string): 'planet' | 'angle' {
+  return name === 'ASC' || name === 'MC' ? 'angle' : 'planet';
 }
 
 export async function POST(req: Request) {
@@ -45,15 +46,17 @@ export async function POST(req: Request) {
     const supabase = createSupabaseServerRouteClient();
 
     // 1) Auth
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user?.id) return bad('Not authenticated', 401);
     const user_id = user.id;
 
     // 2) Input
     const b = (await req.json().catch(() => ({}))) as BodyIn;
     const name = (b.name || '').toString().trim();
-    const date = (b.date || '').toString().trim();           // YYYY-MM-DD
-    const timeIn = b.time ? String(b.time) : null;           // HH:MM | null
+    const date = (b.date || '').toString().trim(); // YYYY-MM-DD
+    const timeIn = b.time ? String(b.time) : null; // HH:MM | null
     const place_name = (b.place_name || '').toString().trim();
     const latNum = toNumber(b.lat);
     const lonNum = toNumber(b.lon);
@@ -74,22 +77,66 @@ export async function POST(req: Request) {
     const dtLocal = DateTime.fromISO(`${date}T${timeSafe}`, { zone: tz });
     const epochMillis = dtLocal.toUTC().toMillis();
 
-    // 5) Calcola punti e aspetti
-    // >>> ORDINE CORRETTO: (tzName, dateISO, timeHHMM, lat, lon)
-    const {
-      points,
-      houses,
-      timestampUTC,
-    }: {
-      points: Point[];
-      houses: boolean;
-      timestampUTC: Date;
-    } = computePoints(tz, date, timeSafe, latNum, lonNum);
+    // 5) Calcola posizioni base e ASC/MC
+    const { points, timestampUTC } = computePoints(tz, date, timeSafe, latNum, lonNum);
 
-    const aspects = computeNatalAspects(points);
+    // 6) Leggi preferenza HOUSE SYSTEM (default 'whole')
+    let houseSystem: HouseSystem = 'whole';
+    {
+      const { data: prefsRow } = await supabase
+        .from('user_prefs')
+        .select('house_system')
+        .eq('user_id', user_id)
+        .maybeSingle();
+      if (prefsRow?.house_system === 'placidus') houseSystem = 'placidus';
+    }
 
-    // 6) Persistenza
-    // 6.1 birth_data (upsert per user_id)
+    // 7) Calcola cuspidi per il sistema scelto (JD UT → from timestampUTC)
+    const jd = timestampUTC.getTime() / 86400000 + 2440587.5;
+    let cusps: number[] = [];
+    let ascDeg = 0;
+    let mcDeg = 0;
+    let systemUsed: HouseSystem = houseSystem;
+    let fallbackApplied = false;
+
+    try {
+      const hres = computeHouses(houseSystem, {
+        jd,
+        latDeg: Number(latNum),
+        lonDeg: Number(lonNum),
+        tzMinutes: tz_off, // per compatibilità firma; non influisce nel calcolo
+      });
+      cusps = hres.cusps;
+      ascDeg = hres.asc;
+      mcDeg = hres.mc;
+    } catch {
+      // Fallback: latitudini estreme o errori → Whole Sign
+      const hres = computeHouses('whole', {
+        jd,
+        latDeg: Number(latNum),
+        lonDeg: Number(lonNum),
+        tzMinutes: tz_off,
+      });
+      cusps = hres.cusps;
+      ascDeg = hres.asc;
+      mcDeg = hres.mc;
+      systemUsed = 'whole';
+      fallbackApplied = true;
+    }
+
+    // 8) Riassegna le case ai punti secondo le cuspidi calcolate
+    const reassigned: Point[] = points.map((p) => {
+      if (p.name === 'ASC') return { ...p, longitude: ascDeg, house: 1 } as Point;
+      if (p.name === 'MC') return { ...p, longitude: mcDeg, house: null } as Point;
+      const h = assignHousesGeneric(p.longitude, cusps);
+      return { ...p, house: h } as Point;
+    });
+
+    // 9) Aspetti (immutati)
+    const aspects = computeNatalAspects(reassigned);
+
+    // ─────────────────────────── Persistenza ─────────────────────────────
+    // 9.0 birth_data (rispetta schema: NIENTE tz_name)
     {
       const { error } = await supabase
         .from('birth_data')
@@ -109,16 +156,37 @@ export async function POST(req: Request) {
       if (error) throw new Error(`birth_data upsert: ${error.message}`);
     }
 
-    // 6.2 chart_points
+    // 9.1 house_cusps (svuota e inserisci 12 righe per (user_id, systemUsed))
+    {
+      const del = await supabase
+        .from('house_cusps')
+        .delete()
+        .eq('user_id', user_id)
+        .eq('system', systemUsed);
+      if (del.error) throw new Error(`house_cusps delete: ${del.error.message}`);
+
+      const rows = cusps.map((lon, idx) => ({
+        user_id,
+        system: systemUsed,
+        cusp: idx + 1,
+        longitude: lon,
+      }));
+      if (rows.length) {
+        const ins = await supabase.from('house_cusps').insert(rows);
+        if (ins.error) throw new Error(`house_cusps insert: ${ins.error.message}`);
+      }
+    }
+
+    // 9.2 chart_points (DEVE avere 'kind' NOT NULL)
     {
       const del = await supabase.from('chart_points').delete().eq('user_id', user_id);
       if (del.error) throw new Error(`chart_points delete: ${del.error.message}`);
 
-      const rows = points.map((p) => ({
+      const rows = reassigned.map((p) => ({
         user_id,
-        kind: pointKind(p),                 // 'planet' oppure 'angle'
+        kind: pointKind(p.name), // 'planet' | 'angle'
         name: p.name,
-        longitude: p.longitude,
+        longitude: Number(p.longitude.toFixed(3)), // rispetta numeric(7,3)
         sign: p.sign,
         house: p.house ?? null,
         retro: p.retro ?? false,
@@ -130,7 +198,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 6.3 natal_aspects
+    // 9.3 natal_aspects (immutato)
     {
       const del = await supabase.from('natal_aspects').delete().eq('user_id', user_id);
       if (del.error) throw new Error(`natal_aspects delete: ${del.error.message}`);
@@ -150,18 +218,21 @@ export async function POST(req: Request) {
       }
     }
 
-    // 7) Done
+    // 10) Done
     return NextResponse.json({
       ok: true,
       info: {
-        housesComputed: houses,
+        housesComputed: true,
+        systemUsed,
+        fallbackApplied,
         timestampUTC,
         epochMillis,
       },
       saved: {
         birth_data: { name, date, time: timeSafe, place_name, tz_offset_minutes: tz_off },
-        points: points.length,
+        points: reassigned.length,
         aspects: aspects.length,
+        house_cusps: 12,
       },
     });
   } catch (err: unknown) {
