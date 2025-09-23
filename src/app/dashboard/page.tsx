@@ -17,6 +17,7 @@ export default async function DashboardHub() {
     { href: '/dashboard/transits', title: 'Transits',          emoji: '🛰️', desc: 'Transiti di oggi e del mese con azioni pratiche.' },
     { href: '/dashboard/daily',    title: 'Daily Horoscope',   emoji: '📅', desc: 'Mappa del cielo del giorno, navigazione date + chat.' },
     { href: '/dashboard/moon',     title: 'Moon',              emoji: '🌙', desc: 'Fase lunare e segno della Luna, consigli quotidiani.' },
+    { href: '/dashboard/people',     title: 'Synastry',         emoji: '🧩', desc: 'Scopri affinità e compatibilità con altre persone' },
   ];
 
   const initialContext =

@@ -95,9 +95,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
+        // --- NEW: house system + cusps context for the chatbot ---
+    // preferenza utente (whole|placidus)
+    const { data: prefRow } = await supabase
+      .from('user_prefs')
+      .select('house_system')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const preferredSystem = (prefRow?.house_system ?? 'whole') as 'whole' | 'placidus';
+
+    // cuspidi correnti (12 righe: cusp 1..12) per il sistema scelto
+    const { data: cuspRows } = await supabase
+      .from('house_cusps')
+      .select('cusp, longitude, system')
+      .eq('user_id', user.id)
+      .eq('system', preferredSystem)
+      .order('cusp', { ascending: true });
+
+    let houseCtx = '';
+    if (Array.isArray(cuspRows) && cuspRows.length === 12) {
+      const cusps = cuspRows.map(r => Number(r.longitude));
+      const asc = cusps[0];
+      const mc  = cusps[9];
+      houseCtx = [
+        `HOUSE_SYSTEM=${preferredSystem.toUpperCase()}`,
+        `ASC=${asc.toFixed(2)}°, MC=${mc.toFixed(2)}°`,
+        `CUSPS: ${cusps.map((deg, i) => `C${i+1}=${deg.toFixed(2)}°`).join(' | ')}`,
+      ].join('\n');
+    } else {
+      // se non ci sono cuspidi salvate (es. utente senza orario di nascita), forniamo solo il sistema
+      houseCtx = `HOUSE_SYSTEM=${preferredSystem.toUpperCase()}\nCUSPS: none`;
+    }
+
+
     const sysBlocks = [
       systemChat,
       techMode ? 'SHOW_TECH=true' : 'SHOW_TECH=false',
+      houseCtx,
       uiContext,
       natalCtx,
       transitsCtx,

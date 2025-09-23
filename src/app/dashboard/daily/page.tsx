@@ -1,165 +1,144 @@
 // src/app/dashboard/daily/page.tsx
-import { headers, cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { DateTime } from 'luxon';
 import { createSupabaseServerComponentClient } from '@/lib/supabaseServer';
-import { computePoints, Point as AstroPoint } from '@/lib/astro';
-import SkyWheel, { SkyPoint } from '@/components/SkyWheel';
-import ChatUI from '@/components/ChatUI';
+import dynamicImport from 'next/dynamic';
+import { redirect } from 'next/navigation';
+import { computeHousesForDateUTC } from '@/lib/houses/runtime';
+import { computeDailyPlanets } from '@/lib/planets/runtime';
+import { assignHouses } from '@/lib/houses/placidus';
 
-type AspectKey = 'conjunction' | 'sextile' | 'square' | 'trine' | 'opposition';
-type TransitHit = {
-  date: string;
-  t_planet: string;
-  n_point: string;
-  aspect: AspectKey;
-  orb: number;
-  score: number;
+export const dynamic = 'force-dynamic';
+
+type HouseSystem = 'whole' | 'placidus';
+
+type PrefsRow = {
+  house_system: HouseSystem | null;
+  current_lat: number | null;
+  current_lon: number | null;
 };
 
-function buildDailyContext(date: string, hits: TransitHit[]): string {
-  const lines = hits.map(
-    (t) => `${date}: ${t.t_planet} ${t.aspect} ${t.n_point} (orb ${t.orb}°, score ${t.score})`
-  );
-  return `CONTEXT_TRANSITS_TODAY
-${lines.join('\n')}
+type ChartPoint = {
+  name: string;
+  longitude: number;
+  sign: string;
+  house: number | null;
+  retro?: boolean | null;
+};
 
-Guidelines:
-- Focalizza su lavoro/relazioni/energia con scenari realistici.
-- Suggerisci 2–3 azioni pratiche legate ai transiti odierni.
-- Evita assoluti; tono empatico. Benessere/entertainment.`;
-}
+const ChartWheel = dynamicImport<{
+  points: ChartPoint[];
+  houseCusps?: number[];
+  mcDeg?: number;
+  orientation?: 'by-asc' | 'by-mc';
+  showHouseNumbers?: boolean;
+  showZodiacRing?: boolean;
+  size?: number;
+  className?: string;
+}>(() => import('@/components/ChartWheel'), { ssr: false });
+
+const ChatUI = dynamicImport(() => import('@/components/ChatUI'), { ssr: false });
+const HouseSystemSwitcher = dynamicImport(() => import('@/components/HouseSystemSwitcher'), { ssr: false });
 
 export default async function DailyPage({
   searchParams,
 }: {
-  searchParams: { date?: string };
+  searchParams?: { houses?: string };
 }) {
   const supabase = createSupabaseServerComponentClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect('/onboarding');
 
-  // leggi preferenze utente (per tz/lat/lon attuali)
-  const { data: prefs } = await supabase
+  const { data: prefs, error: prefsErr } = await supabase
     .from('user_prefs')
-    .select('current_city, current_lat, current_lon, current_tz_name')
+    .select('house_system, current_lat, current_lon')
     .eq('user_id', user.id)
-    .maybeSingle();
+    .single<PrefsRow>();
 
-  const tz = prefs?.current_tz_name ?? 'UTC';
+  if (prefsErr || !prefs || prefs.current_lat == null || prefs.current_lon == null) {
+    redirect('/onboarding');
+  }
 
-  // data selezionata o oggi nella tz utente
-  const now = DateTime.now().setZone(tz);
-  const dateISO = (() => {
-    const q = searchParams.date;
-    if (q && /^\d{4}-\d{2}-\d{2}$/.test(q)) return q;
-    return now.toISODate()!;
-  })();
+  const system: HouseSystem = prefs.house_system === 'placidus' ? 'placidus' : 'whole';
+  const lat = Number(prefs.current_lat);
+  const lon = Number(prefs.current_lon);
 
-  // frecce prev/next
-  const prev = DateTime.fromISO(dateISO, { zone: tz }).minus({ days: 1 }).toISODate()!;
-  const next = DateTime.fromISO(dateISO, { zone: tz }).plus({ days: 1 }).toISODate()!;
+  const nowUTC = new Date();
 
-  // calcolo ruota cielo del giorno (usiamo 09:00 locale per avere ASC/MC se lat/lon presenti)
-  const lat = typeof prefs?.current_lat === 'number' ? prefs!.current_lat : null;
-  const lon = typeof prefs?.current_lon === 'number' ? prefs!.current_lon : null;
-  const { points, houses } = computePoints(tz, dateISO, '09:00', lat, lon);
+  const houses = computeHousesForDateUTC({
+    system,
+    dateUTC: nowUTC,
+    latDeg: lat,
+    lonDeg: lon,
+  });
 
-  const skyPoints: SkyPoint[] = points.map((p: AstroPoint) => ({
+  // Toggle case via querystring: ?houses=0 le nasconde
+  const showHouses = (searchParams?.houses ?? '1') !== '0';
+
+  // Pianeti del giorno (nascondiamo il marker retro per evitare il simbolo ℞/Px)
+  const runtimePlanets = computeDailyPlanets(nowUTC);
+  const points: ChartPoint[] = runtimePlanets.map((p) => ({
     name: p.name,
     longitude: p.longitude,
     sign: p.sign,
-    house: p.house,
-    retro: p.retro,
+    house: assignHouses(p.longitude, houses.cusps),
+    retro: false, // ← niente marker retro in /daily
   }));
 
-  // fetch transiti del giorno (per il contesto chat)
-  const h = headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
-  const proto = h.get('x-forwarded-proto') ?? 'http';
-  const base = `${proto}://${host}`;
-  const trRes = await fetch(`${base}/api/transits?date=${dateISO}&limit=7`, {
-    cache: 'no-store',
-    headers: { cookie: cookies().toString() },
-  });
-
-  let hits: TransitHit[] = [];
-  if (trRes.ok) {
-    const j = (await trRes.json()) as { ok?: boolean; top?: TransitHit[] };
-    if (j.ok && Array.isArray(j.top)) hits = j.top;
-  }
-
-  const ctx = buildDailyContext(dateISO, hits);
-
   return (
-    <div className="p-6">
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Colonna sinistra (2/3): controlli + ruota + lista transiti rapida */}
-        <div className="xl:col-span-2 space-y-4">
-          <header className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <a
-                href={`/dashboard/daily?date=${prev}`}
-                className="rounded-lg border px-3 py-1 hover:bg-gray-50"
-                title="Giorno precedente"
-              >
-                ◀
-              </a>
-              <a
-                href={`/dashboard/daily?date=${next}`}
-                className="rounded-lg border px-3 py-1 hover:bg-gray-50"
-                title="Giorno successivo"
-              >
-                ▶
-              </a>
-            </div>
-
-            <form method="get" className="flex items-center gap-2">
-              <input
-                type="date"
-                name="date"
-                defaultValue={dateISO}
-                className="rounded-lg border px-3 py-1 text-sm"
-              />
-              <button className="rounded-lg border px-3 py-1 text-sm hover:bg-gray-50">
-                Vai
-              </button>
-            </form>
-          </header>
-
-          <SkyWheel
-            title={`Mappa del cielo · ${dateISO} ${houses ? '(con ASC/MC)' : ''}`}
-            points={skyPoints}
-          />
-
-          {/* Top transiti del giorno (preview) */}
-          <div className="rounded-2xl border p-4">
-            <div className="mb-2 text-sm font-medium">Top transiti di oggi</div>
-            {hits.length === 0 ? (
-              <div className="text-sm text-gray-600">Nessun transito rilevante rilevato.</div>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {hits.map((t, i) => (
-                  <li key={`${t.t_planet}-${t.n_point}-${i}`} className="flex items-center justify-between">
-                    <div>
-                      {t.t_planet} {t.aspect} {t.n_point}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      orb {t.orb.toFixed(1)}° · score {Math.round(t.score)}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+    <div className="grid lg:grid-cols-2 gap-6">
+      <div className="rounded-2xl border p-4">
+        <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Daily wheel</h2>
+        <HouseSystemSwitcher current={system} />
+        </div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">
+            Daily Chart — {houses.system === 'placidus' ? 'Placidus' : 'Whole Sign'}
+          </h2>
+          <div className="flex items-center gap-3 text-xs">
+            <a
+              className="underline text-blue-600"
+              href={showHouses ? '?houses=0' : '?houses=1'}
+            >
+              {showHouses ? 'Nascondi case' : 'Mostra case'}
+            </a>
+            <span className="text-gray-500">
+              {new Intl.DateTimeFormat('it-IT', {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              }).format(nowUTC)}{' '}
+              UTC
+            </span>
           </div>
         </div>
 
-        {/* Colonna destra (1/3): Chat sticky con contesto del giorno */}
-        <div className="xl:col-span-1">
-          <div className="sticky top-6 h-[75vh]">
-            <ChatUI initialContext={ctx} />
+        {houses.fallbackApplied && (
+          <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-sm px-3 py-2">
+            Placidus non è definito per latitudini estreme. Visualizzazione in Whole Sign.
           </div>
+        )}
+
+        <ChartWheel
+          points={points}
+          houseCusps={showHouses ? houses.cusps : undefined}
+          mcDeg={houses.mc}
+          orientation="by-asc"
+          showZodiacRing
+          showHouseNumbers={showHouses}
+          size={520}
+        />
+
+        <div className="mt-3 text-xs text-gray-600 space-y-1">
+          <div><span className="font-medium">ASC:</span> {houses.asc.toFixed(2)}°</div>
+          <div><span className="font-medium">MC:</span> {houses.mc.toFixed(2)}°</div>
+          <div className="text-gray-500">Calcolo <em>runtime</em>; nessuna persistenza su DB.</div>
         </div>
+      </div>
+
+      <div className="rounded-2xl border p-4 min-h-[480px]">
+        <h2 className="text-lg font-semibold mb-3">Ask about today</h2>
+        <ChatUI />
       </div>
     </div>
   );
