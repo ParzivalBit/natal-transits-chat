@@ -2,6 +2,7 @@
 import { createSupabaseServerComponentClient } from '@/lib/supabaseServer';
 import dynamicImport from 'next/dynamic';
 import { redirect } from 'next/navigation';
+import { computeHouses } from '@/lib/astro';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,14 +13,13 @@ type ChartPoint = {
   house: number | null;
   retro: boolean;
 };
+type HouseSystem = 'placidus' | 'whole';
 
-// Carichiamo i componenti lato client
 const ChartWheel = dynamicImport<{
   points: ChartPoint[];
   houseCusps?: number[];
   mcDeg?: number;
   orientation?: 'by-asc' | 'by-mc';
-  direction?: 'cw' | 'ccw';
   showHouseNumbers?: boolean;
   showZodiacRing?: boolean;
   size?: number;
@@ -27,83 +27,106 @@ const ChartWheel = dynamicImport<{
 }>(() => import('@/components/ChartWheel'), { ssr: false });
 
 const ChatUI = dynamicImport(() => import('@/components/ChatUI'), { ssr: false });
+const HouseSystemSwitcher = dynamicImport(() => import('@/components/HouseSystemSwitcher'), { ssr: false });
+
+function has12(arr: unknown[] | null | undefined): arr is number[] {
+  return !!arr && arr.length === 12 && arr.every(v => Number.isFinite(Number(v)));
+}
 
 export default async function Page() {
   const supabase = createSupabaseServerComponentClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/onboarding');
+  const auth = await supabase.auth.getUser();
+  const userId = auth.data.user?.id ?? null;
+  if (!userId) redirect('/onboarding');
 
-  // 1) Preferenza sistema case
+  // Sistema preferito
   const { data: prefs } = await supabase
     .from('user_prefs')
     .select('house_system')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .maybeSingle();
 
-  const houseSystem: 'whole' | 'placidus' =
-    prefs?.house_system === 'placidus' ? 'placidus' : 'whole';
+  const system: HouseSystem = prefs?.house_system === 'placidus' ? 'placidus' : 'whole';
 
-  // 2) Punti della carta
-  const { data: points } = await supabase
-    .from('chart_points')
-    .select('name,longitude,sign,house,retro')
-    .eq('user_id', user.id)
-    .order('name', { ascending: true });
-
-  const hasPoints = Array.isArray(points) && points.length > 0;
-
-  // 3) Cuspidi per il sistema scelto
+  // Cuspidi per il sistema preferito
   const { data: cuspsRows } = await supabase
     .from('house_cusps')
     .select('cusp, longitude')
-    .eq('user_id', user.id)
-    .eq('system', houseSystem)
+    .eq('user_id', userId)
+    .eq('system', system)
     .order('cusp', { ascending: true });
 
-  const cuspsList: number[] = (cuspsRows ?? []).map(r => Number(r.longitude));
-  const hasCusps = cuspsList.length === 12;
-  const houseCusps: number[] | undefined = hasCusps ? cuspsList : undefined;
+  let cusps: number[] | null =
+    Array.isArray(cuspsRows) && cuspsRows.length === 12
+      ? cuspsRows.map(r => Number(r.longitude))
+      : null;
 
-  // 4) MC (se serve per orientation='by-mc' o come fallback)
-  const mcPoint = (points ?? []).find(p => p.name === 'MC');
-  const mcDeg: number | undefined = typeof mcPoint?.longitude === 'number'
-    ? mcPoint.longitude
-    : undefined;
+  // Fallback runtime da birth_data (se l’utente non ha ancora scritto house_cusps per questo system)
+  if (!has12(cusps)) {
+    const { data: bd } = await supabase
+      .from('birth_data')
+      .select('date,time,tz_offset_minutes,lat,lon')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (bd?.date && bd.time && bd.lat != null && bd.lon != null) {
+      // calcolo JD UT semplificato (stesso criterio che usiamo nel route di compute)
+      const [hh, mm] = String(bd.time).slice(0, 5).split(':').map(Number);
+      const local = new Date(`${bd.date}T${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:00Z`);
+      const tzOff = Number(bd.tz_offset_minutes ?? 0);
+      const utcMillis = local.getTime() - tzOff * 60_000;  // local - offset = UTC
+      const jd = 2440587.5 + utcMillis / 86_400_000;
+
+      const houses = computeHouses(system, {
+        jd,
+        latDeg: Number(bd.lat),
+        lonDeg: Number(bd.lon),
+        tzMinutes: tzOff,
+      });
+      cusps = houses.cusps;
+    } else {
+      cusps = null;
+    }
+  }
+
+  const { data: points } = await supabase
+    .from('chart_points')
+    .select('name,longitude,sign,house,retro')
+    .eq('user_id', userId)
+    .order('name', { ascending: true });
+
+  const hasPoints = Array.isArray(points) && points.length > 0;
+  const mcDeg = has12(cusps) ? cusps[9] : undefined;
 
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       <div className="rounded-2xl border p-4">
-        <h2 className="text-lg font-semibold mb-3">
-          Natal Chart ({houseSystem === 'placidus' ? 'Placidus' : 'Whole Sign'})
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">
+            Natal Chart — {system === 'placidus' ? 'Placidus' : 'Whole Sign'}
+          </h2>
+          <HouseSystemSwitcher current={system} />
+        </div>
 
-        {hasPoints ? (
-          <>
-            <ChartWheel
-              points={points as ChartPoint[]}
-              houseCusps={houseCusps}
-              mcDeg={mcDeg}
-              orientation="by-asc"   // ASC a sinistra
-              //direction="cw"         // zodiaco orario (come AstroDienst)
-              showHouseNumbers
-              showZodiacRing
-              size={560}
-            />
-            {!hasCusps && (
-              <p className="mt-3 text-xs text-amber-600">
-                Cuspidi non trovate per <span className="font-semibold">{houseSystem}</span>.
-                Esegui il ricalcolo da <span className="font-medium">Onboarding</span> o fai una POST a <code className="font-mono">/api/chart/compute</code>.
-              </p>
-            )}
-          </>
-        ) : (
+        {!hasPoints ? (
           <p className="text-sm text-gray-600">
-            Nessun dato. Vai in <span className="font-medium">Onboarding</span> e salva i dati di nascita, poi ricalcola.
+            Nessun dato. Vai in <span className="font-medium">Onboarding</span> e salva i dati di nascita.
           </p>
+        ) : (
+          <ChartWheel
+            key={`${system}-${has12(cusps) ? cusps[0].toFixed(3) : 'no-cusps'}`}
+            points={points as ChartPoint[]}
+            houseCusps={has12(cusps) ? cusps : undefined}
+            mcDeg={mcDeg}
+            orientation="by-asc"
+            showZodiacRing
+            showHouseNumbers
+            size={520}
+          />
         )}
 
         <p className="mt-2 text-xs text-gray-500">
-          House system: <span className="font-medium">{houseSystem === 'placidus' ? 'Placidus' : 'Whole Sign'}</span>.
+          Lo switch ricalcola ASC/MC e cuspidi e salva in <code>house_cusps</code>.
         </p>
       </div>
 
