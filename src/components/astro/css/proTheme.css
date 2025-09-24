@@ -1,0 +1,38 @@
+/* FILE: src/components/astro/proTheme.css */
+
+/* 
+  Palette guidata da CSS variables.
+  Se ChartWheelPro/natal-pro definiscono già variabili di tema,
+  queste faranno semplicemente da fallback.
+*/
+
+:root {
+  /* Segni – fallback */
+  --sign-aries: #e05858;
+  --sign-taurus: #c58b2b;
+  --sign-gemini: #d6a11a;
+  --sign-cancer: #4aa9c8;
+  --sign-leo: #f08c2e;
+  --sign-virgo: #3e8e7e;
+  --sign-libra: #b66ad3;
+  --sign-scorpio: #6b5bd3;
+  --sign-sagittarius: #3ea56e;
+  --sign-capricorn: #2f4858;
+  --sign-aquarius: #4b8bd8;
+  --sign-pisces: #6fb0ff;
+
+  /* Aspetti – fallback */
+  --aspect-conjunction: #3a3a3a;
+  --aspect-sextile: #1e88e5;
+  --aspect-square: #d32f2f;
+  --aspect-trine: #43a047;
+  --aspect-opposition: #8e24aa;
+
+  /* Ruota */
+  --wheel-stroke: #101419;
+  --grid-stroke: #9aa4b214;   /* linee sottili intermedie */
+  --grid-strong: #9aa4b235;   /* linee cuspidi/cerchi principali */
+  --planet-fill: #0f172a;     /* balloon pianeti */
+  --planet-fill-dim: #0f172a55;
+  --planet-label: #ffffff;
+}
