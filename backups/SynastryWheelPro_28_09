@@ -28,31 +28,16 @@ export type SynastryWheelProProps = {
   className?: string;
 };
 
-const COLOR_USER = '#1d4ed8';
-const COLOR_PERSON = '#f59e0b';
+// palette
+const COLOR_USER = '#1d4ed8';   // blu
+const COLOR_PERSON = '#f59e0b'; // arancione
 const GRID = '#e5e7eb';
 const GRID_STRONG = '#9ca3af';
 const TEXT = '#374151';
-const ZODIAC_ALT_FILL = 'rgba(0,0,0,0.025)';
+const FILL_BAND = 'rgba(0,0,0,0)'; // bande trasparenti (solo bordi). Cambia se vuoi un leggero fill.
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const norm = (d: number) => ((d % 360) + 360) % 360;
-
-// helper per disegnare un settore ad anello tra due raggi
-function ringSectorPath(
-  cx: number, cy: number,
-  rOuter: number, rInner: number,
-  startDeg: number, endDeg: number
-): string {
-  const sweep = ((endDeg - startDeg) % 360 + 360) % 360;
-  const large = sweep > 180 ? 1 : 0;
-  const p1 = polarToXY(cx, cy, rOuter, startDeg);
-  const p2 = polarToXY(cx, cy, rOuter, endDeg);
-  const p3 = polarToXY(cx, cy, rInner, endDeg);
-  const p4 = polarToXY(cx, cy, rInner, startDeg);
-  // outer arc (sweep=1), line, inner arc (reverse, sweep=0), close
-  return `M ${p1.x} ${p1.y} A ${rOuter} ${rOuter} 0 ${large} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${rInner} ${rInner} 0 ${large} 0 ${p4.x} ${p4.y} Z`;
-}
 
 export default function SynastryWheelPro({
   user, person, aspects,
@@ -61,28 +46,33 @@ export default function SynastryWheelPro({
   const r = size / 2;
 
   // === struttura radiale ===
+  // partiamo da: fascia zodiacale (spessa), poi fascia utente, poi fascia persona, poi aspect ring
   const radiiBase = {
-    zodiac: r * 0.94,
-    innerGap: r * 0.44,
-    center: r * 0.34,
+    zodiac: r * 0.94,     // bordo esterno dei segni (etichette)
+    innerGap: r * 0.44,   // raggio ESTERNO dell'aspettogramma (bordo inferiore fascia persona)
+    center: r * 0.34,     // cerchio guida interno
     ...(options?.radii ?? {}),
   };
 
   const thickness = {
-    zodiacBand:  r * 0.06,
-    userBand:    r * 0.10,
-    personBand:  r * 0.10,
+    zodiacBand:  r * 0.06,  // spessore fascia segni
+    userBand:    r * 0.10,  // spessore fascia utente
+    personBand:  r * 0.10,  // spessore fascia persona
   };
 
+  // bordi fascia segni
   const RzOuter = radiiBase.zodiac;
   const RzInner = RzOuter - thickness.zodiacBand;
 
+  // bordi fascia persona (vincolo: bordo inferiore = innerGap)
   const RpInner = radiiBase.innerGap;
   const RpOuter = RpInner + thickness.personBand;
 
+  // bordi fascia utente (vincoli: sup=RzInner, inf=RpOuter)
   const RuOuter = RzInner;
   const RuInner = RpOuter;
 
+  // raggio medio per i glifi
   const RuMid = (RuOuter + RuInner) / 2;
   const RpMid = (RpOuter + RpInner) / 2;
 
@@ -100,7 +90,7 @@ export default function SynastryWheelPro({
   }, [person.axes?.asc, person.axes?.mc]);
 
   // rotazione: ASC utente a ore 9 (270° schermo)
-  const rot = useMemo(() => (isNum(axesUser?.asc) ? norm(270 - axesUser.asc) : 0), [axesUser?.asc]);
+  const rot = useMemo(() => norm(270 - (axesUser?.asc ?? 180)), [axesUser?.asc]);
   const applyRot = (deg: number) => norm(deg + rot + (options?.angleOffsetDeg ?? 0));
 
   const [hover, setHover] = useState<{ key: string; kind: 'planet'|'aspect' } | null>(null);
@@ -118,95 +108,52 @@ export default function SynastryWheelPro({
     }
   };
 
-  // posizioni pianeti (ruotate) — filtra ASC/MC (gli assi hanno il proprio drawer)
-  const userPos = user.points
-    .filter((p) => p.name !== 'ASC' && p.name !== 'MC')
-    .map((p) => ({ ...p, ang: applyRot(p.lon) }));
-  const personPos = person.points
-    .filter((p) => p.name !== 'ASC' && p.name !== 'MC')
-    .map((p) => ({ ...p, ang: applyRot(p.lon) }));
+  // posizioni pianeti (ruotate)
+  const userPos = user.points.map(p => ({ ...p, ang: applyRot(p.lon) }));
+  const personPos = person.points.map(p => ({ ...p, ang: applyRot(p.lon) }));
 
-  // collision avoidance (preserva l'ordine)
-  const userAngles = resolveCollisions(userPos.map((p) => p.ang), 8);
-  const personAngles = resolveCollisions(personPos.map((p) => p.ang), 8);
+  // collision avoidance
+  const userAngles = resolveCollisions(userPos.map(p => p.ang), 8);
+  const personAngles = resolveCollisions(personPos.map(p => p.ang), 8);
 
   const cx = r, cy = r;
 
   // =======================================================================
   // DRAWERS
   // =======================================================================
-  function drawZodiac(): JSX.Element {
-    const nodes: JSX.Element[] = [];
-
-    for (let i = 0; i < 12; i++) {
-      const start = applyRot(i * 30);
-      const end = applyRot((i + 1) * 30);
-      const mid = applyRot(i * 30 + 15);
-
-      // fill alternato (leggiero) per separare i settori
-      if (i % 2 === 0) {
-        nodes.push(
-          <path
-            key={`zfill-${i}`}
-            d={ringSectorPath(cx, cy, RzOuter, RzInner, start, end)}
-            fill={ZODIAC_ALT_FILL}
-            stroke="none"
-          />
-        );
-      }
-
-      // arco esterno (già presente)
-      nodes.push(
-        <path
-          key={`zarc-${i}`}
-          d={describeArc(cx, cy, RzOuter, start, end)}
-          stroke={GRID}
-          strokeWidth={1.2}
-          fill="none"
-        />
-      );
-
-      // tacca radiale di separazione del segno
-      const tickPout = polarToXY(cx, cy, RzOuter, start);
-      const tickPin  = polarToXY(cx, cy, RzInner, start);
-      nodes.push(
-        <line
-          key={`ztick-${i}`}
-          x1={tickPout.x} y1={tickPout.y} x2={tickPin.x} y2={tickPin.y}
-          stroke={GRID} strokeWidth={0.8}
-        />
-      );
-
-      // label del segno
-      const labelPt = polarToXY(cx, cy, RzOuter + 8, mid);
-      nodes.push(
-        <text
-          key={`zlabel-${i}`}
-          x={labelPt.x} y={labelPt.y}
-          textAnchor="middle" dominantBaseline="middle"
-          fontSize={12} fill={TEXT}
-        >
+function drawZodiac() {
+  const arcs = [];
+  for (let i = 0; i < 12; i++) {
+    const start = applyRot(i * 30);
+    const end = applyRot((i + 1) * 30);
+    const mid = applyRot(i * 30 + 15);
+    const path = describeArc(cx, cy, RzOuter, start, end);
+    arcs.push(
+      <g key={`z${i}`}>
+        {/* SOLO bordo esterno segni */}
+        <path d={path} stroke={GRID} strokeWidth={1.2} fill="none" />
+        {/* NIENTE bordo interno qui: sarà il bordo ESTERNO fascia utente */}
+        <text x={polarToXY(cx, cy, RzOuter + 8, mid).x}
+              y={polarToXY(cx, cy, RzOuter + 8, mid).y}
+              textAnchor="middle" dominantBaseline="middle"
+              fontSize={12} fill={TEXT}>
           {signChar(([
             'Aries','Taurus','Gemini','Cancer','Leo','Virgo',
             'Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'
           ][i] as ZodiacSign))}
         </text>
-      );
-    }
-
-    // bordo interno sottilissimo (coincide col bordo superiore della fascia UTENTE)
-    nodes.push(
-      <circle key="z-inner" cx={cx} cy={cy} r={RzInner} fill="none" stroke={GRID} strokeWidth={0.6} />
+      </g>
     );
-
-    return <g>{nodes}</g>;
   }
+  return <g>{arcs}</g>;
+}
 
+  // === fascia case con tacche che attraversano lo spessore ===
   function drawHouseBand(cusps: number[] | undefined, color: string, rOuter: number, rInner: number, labelsInside: boolean) {
     if (!cusps || cusps.length !== 12) return null;
 
-    const ticks: JSX.Element[] = [];
-    const labels: JSX.Element[] = [];
+    const ticks: React.ReactNode[] = [];
+    const labels: React.ReactNode[] = [];
 
     const labelOffset = labelsInside ? -12 : 12;
     for (let i = 0; i < 12; i++) {
@@ -244,7 +191,8 @@ export default function SynastryWheelPro({
 
     return (
       <g>
-        <circle cx={cx} cy={cy} r={rOuter} fill="none" stroke={GRID_STRONG} />
+        {/* due bordi della fascia */}
+        <circle cx={cx} cy={cy} r={rOuter} fill={FILL_BAND} stroke={GRID_STRONG} />
         <circle cx={cx} cy={cy} r={rInner} fill="none" stroke={GRID_STRONG} />
         {ticks}
         {labels}
@@ -317,6 +265,7 @@ export default function SynastryWheelPro({
     );
   }
 
+  // aspettogramma confinato nel ring centrale + hover cooperativo
   function drawAspects(lines: SynastryAspect[]) {
     const clipId = 'syn-center-clip';
     return (
@@ -386,10 +335,10 @@ export default function SynastryWheelPro({
         {/* fascia segni */}
         {drawZodiac()}
 
-        {/* fascia UTENTE */}
+        {/* fascia UTENTE: bordi + tacche (bordo sup = RzInner, bordo inf = RpOuter) */}
         {drawHouseBand(user.houses, COLOR_USER, RuOuter, RuInner, false)}
 
-        {/* fascia PERSONA */}
+        {/* fascia PERSONA: bordi + tacche (bordo sup = RuInner, bordo inf = RpInner = aspect ring) */}
         {drawHouseBand(person.houses, COLOR_PERSON, RpOuter, RpInner, true)}
 
         {/* assi */}
@@ -399,7 +348,7 @@ export default function SynastryWheelPro({
         {/* aspettogramma */}
         {drawAspects(aspects)}
 
-        {/* glifi dentro le fasce */}
+        {/* glifi dentro le fasce (raggio mediano) */}
         {drawPlanets(userPos, COLOR_USER, RuMid, 'user')}
         {drawPlanets(personPos, COLOR_PERSON, RpMid, 'person')}
 

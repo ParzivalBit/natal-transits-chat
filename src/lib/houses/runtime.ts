@@ -34,3 +34,36 @@ export function computeHousesForDateUTC(params: {
     fallbackApplied,
   };
 }
+
+// append to: src/lib/houses/runtime.ts
+import { DateTime } from 'luxon';
+
+export async function computePersonHousesForUserSystem(params: {
+  person: {
+    birth_date: string;           // YYYY-MM-DD
+    birth_time?: string | null;   // HH:MM
+    tz_offset_minutes?: number | null;
+    lat: number;
+    lon: number;
+  };
+  userHouseSystem: HouseSystem;   // 'whole' | 'placidus'
+}) {
+  const { person, userHouseSystem } = params;
+  if (!person?.birth_date || person.lat == null || person.lon == null) {
+    return { system: userHouseSystem, cusps: undefined, asc: undefined, mc: undefined, fallbackApplied: false };
+  }
+  const hhmm = person.birth_time ?? '12:00';
+  const off = person.tz_offset_minutes ?? 0;
+
+  const local = DateTime.fromISO(`${person.birth_date}T${hhmm}:00`, { zone: 'UTC' }).toJSDate();
+  // correggo l'UTC applicando l'offset (minuti) memorizzato
+  const dateUTC = new Date(local.getTime() - off * 60_000);
+
+  const res = computeHousesForDateUTC({
+    system: userHouseSystem,
+    dateUTC,
+    latDeg: person.lat,
+    lonDeg: person.lon,
+  });
+  return res;
+}
