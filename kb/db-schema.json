@@ -1,4 +1,6 @@
-{
+[
+  {
+    "schema_json": {
       "schemas": [
         {
           "name": "public",
@@ -393,7 +395,7 @@
                 {
                   "name": "user_id",
                   "type": "uuid",
-                  "default": null,
+                  "default": "auth.uid()",
                   "nullable": false
                 },
                 {
@@ -536,6 +538,62 @@
               ]
             },
             {
+              "name": "people_house_cusps",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "uuid",
+                  "default": "gen_random_uuid()",
+                  "nullable": false
+                },
+                {
+                  "name": "person_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "system",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "cusp",
+                  "type": "smallint",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "longitude",
+                  "type": "numeric",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "people_house_cusps_person_id_fkey",
+                  "columns": [
+                    "person_id"
+                  ],
+                  "ref_table": "public.people",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            {
               "name": "people_natal_aspects",
               "columns": [
                 {
@@ -597,6 +655,126 @@
                     "person_id"
                   ],
                   "ref_table": "public.people",
+                  "ref_columns": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "synastry_aspects",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "uuid",
+                  "default": "gen_random_uuid()",
+                  "nullable": false
+                },
+                {
+                  "name": "user_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "person_id",
+                  "type": "uuid",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "p1_name",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "p1_owner",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "p2_name",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "p2_owner",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "aspect",
+                  "type": "text",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "angle",
+                  "type": "numeric",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "orb",
+                  "type": "numeric",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "applying",
+                  "type": "boolean",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "score",
+                  "type": "numeric",
+                  "default": null,
+                  "nullable": false
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamp with time zone",
+                  "default": "now()",
+                  "nullable": false
+                },
+                {
+                  "name": "min_name",
+                  "type": "text",
+                  "default": "LEAST(p1_name, p2_name)",
+                  "nullable": true
+                },
+                {
+                  "name": "max_name",
+                  "type": "text",
+                  "default": "GREATEST(p1_name, p2_name)",
+                  "nullable": true
+                }
+              ],
+              "primary_key": [
+                "id"
+              ],
+              "foreign_keys": [
+                {
+                  "name": "synastry_aspects_person_id_fkey",
+                  "columns": [
+                    "person_id"
+                  ],
+                  "ref_table": "public.people",
+                  "ref_columns": [
+                    "id"
+                  ]
+                },
+                {
+                  "name": "synastry_aspects_user_id_fkey",
+                  "columns": [
+                    "user_id"
+                  ],
+                  "ref_table": "auth.users",
                   "ref_columns": [
                     "id"
                   ]
@@ -788,3 +966,5 @@
         }
       ]
     }
+  }
+]

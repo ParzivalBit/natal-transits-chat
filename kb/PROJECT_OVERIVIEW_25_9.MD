@@ -1,0 +1,276 @@
+Natal Transit AI — Guida alla Codebase (per ChatGPT)
+
+Questo documento descrive a cosa serve ogni file, dove viene usato, come interagisce col DB Supabase e quali moduli richiama, basandosi sulla KB allegata e sullo schema db-schema.json. È pensato per essere allegato alla codebase e usato come contesto iniziale in una nuova chat.
+
+1) Mappa generale del repository
+
+La KB elenca tutti i path e le dimensioni: consulta _INDEX.md per l’inventario completo dei file (Next.js App Router, API Routes, componenti, librerie interne, script).
+
+Stack principale e script (dev, build, export:kb, docs:schema) sono in package.json. Dipendenze core: next@14, react@18, astronomy-engine, @supabase/*, luxon, zod.
+
+2) Frontend — Pagine (App Router)
+src/app/layout.tsx
+
+Layout globale (intestazione, footer, disclaimer); styling via globals.css.
+
+src/app/page.tsx
+
+Landing con CTA verso /dashboard o /onboarding se non autenticato. Legge lo user con Supabase SSR client.
+
+src/app/chat/page.tsx
+
+Pagina Chat semplice che monta <ChatUI /> (interfaccia verso /api/chat).
+
+src/app/onboarding/page.tsx
+
+Flusso di onboarding: se non loggato mostra <AuthForm />. Se loggato legge da DB:
+
+birth_data (name, date, time, place, lat, lon) per i dati di nascita,
+
+user_prefs (current location, timezone, house_system) per preferenze,
+e mostra <BirthSection /> e <CurrentLocationForm />. Scrive/legge da birth_data e user_prefs tramite form+API.
+
+Dashboard (macro-sezioni)
+
+L’indice della KB elenca le pagine /dashboard: natal, transits (giornalieri e mensili), daily sky, moon, people/sinastria; tutte leggono preferenze/cuspidi/posizioni e forniscono contesto al chatbot.
+
+Esempio “daily” (cielo del giorno): src/app/dashboard/daily/page.tsx importa computePoints da lib/astro e visualizza con SkyWheel. Fornisce i pianeti del giorno e metadati (segno, casa, retro) calcolati a runtime; la pagina è protetta (redirect se non autenticati).
+
+3) Frontend — Componenti UI/Chart
+src/components/SkyWheel.tsx
+
+Ruota “cielo del giorno”. Input: array di punti (name, longitude, sign, house, retro). Output: SVG/HTML assoluto con tacche dei segni e badge con glifi planetari; 0° in alto, orientamento coerente. Niente scritture DB: è puro rendering.
+
+src/components/astro/ChartWheelPro.tsx
+
+Ruota tema natale (Pro) con:
+
+calcolo aspetti natali (conjunction, opposition, trine, square, sextile; orb 6° default),
+
+collision avoidance delle etichette,
+
+assi ASC/MC derivati da cusps o passati via props,
+
+rotazione per avere l’ASC a sinistra (≈270°),
+
+evidenziazione interattiva pianeti/linee di aspetto. Nessuna I/O DB: consumo dati già calcolati.
+
+src/components/astro/_parts.tsx
+
+Libreria di parti SVG riutilizzabili per le ruote “Pro”:
+
+ZodiacRingPro, HousesRingPro, PlanetGlyphsPro, AspectLinesStraightToday, AspectGuides.
+Definisce glifi, palette CSS, utilities polari, e aspetti con colori standard. Nessuna I/O DB.
+
+src/components/TransitsPanel.tsx
+
+Pannello “Transits” (client) che:
+
+calcola pianeti in transito con computeDailyPlanets(dateUTC),
+
+assegna le case natali dei transiti tramite assignHouses(p.longitude, natalCusps) (Placidus-safe),
+
+genera Top 3 transiti giorno ↔ punti natali via matching aspetti e orbi standard,
+
+renderizza con ChartWheel (ruota classica) + lista ranking.
+Niente scritture DB; legge cuspidi/punti natali passati come props dal server.
+
+src/components/PeoplePanel.tsx
+
+Form server action per creare/aggiornare “persona” destinata alla sinastria:
+
+Upsert in people (id, user_id, label, birth_*).
+
+Geocoding on-save (Nominatim) se mancano birth_lat/lon, poi update di people.
+
+Calcola pianeti natalizi (usando computeDailyPlanets(dateUTC) come base) e popola people_chart_points (solo person_id, no user_id).
+
+Revalidate e redirect a /lab/people-pro/[id].
+
+4) Pagine “Lab” (sandbox grafica)
+src/app/lab/transits-pro/page.tsx + ClientTransitsPro.tsx
+
+Ambiente di prova per la ruota transiti “Pro”:
+
+carica i pianeti di oggi via computeDailyPlanets(nowUTC),
+
+carica i punti natali utente da chart_points (DB) se loggato,
+
+calcola le cuspidi natalizie a runtime via computeHousesForDateUTC({system, dateUTC, latDeg, lonDeg}) leggendo user_prefs.house_system e birth_data (fallback se mancano dati),
+
+UI controlli: toggle aspetti e orb offset; monta <TransitsWheelPro />.
+Letture DB: chart_points, user_prefs, birth_data. Nessuna scrittura.
+
+Nota: la cartella /lab serve a testare componenti nuovi (…Pro) senza toccare i file di produzione.
+
+5) Backend — API Routes
+
+L’elenco completo è in _INDEX.md; di seguito i più rilevanti.
+
+Auth
+
+src/app/api/auth/set-session/route.ts: imposta cookie sessione da token (Supabase SSR route client).
+
+src/app/auth/callback/route.ts: scambia code → sessione (PKCE/Email OTP), redirect a /onboarding#birth.
+
+src/app/api/auth/signout/route.ts: supabase.auth.signOut(), risponde JSON.
+
+Utente / Preferenze
+
+src/app/api/user/prefs/route.ts: upsert user_prefs (house_system, current_*); no lettura di massa.
+
+Astro/Calcolo & Persistenza
+
+src/app/api/chart/compute/route.ts: endpoint centrale (nella KB/overview) che calcola posizioni, case e scrive su birth_data, chart_points, natal_aspects, e (se previsto) house_cusps. Viene citato come fulcro del flusso onboarding → compute.
+
+src/app/api/transits/route.ts e src/app/api/transits/month/route.ts: calcolo transiti “oggi” e “mese” (astronomy-engine, ranking con punteggi/orbi). Senza persistenza.
+
+Chatbot e testi
+
+src/app/api/chat/route.ts: costruisce il contesto (preferenze/case da user_prefs+house_cusps, natal da chart_points, transiti odierni, eventuale contesto UI), chiama OpenAI e salva cronologia in chat_sessions/chat_messages.
+
+src/app/api/interpret/natal/route.ts e src/app/api/interpret/transits/route.ts: componitori di testi interpretativi (pipeline lib/composer), solo letture da interpretations e dati utente, nessuna scrittura.
+
+People (sinastria)
+
+src/app/api/people/route.ts (GET/POST) e [id]/route.ts: CRUD base su people + popolamento people_chart_points/people_natal_aspects.
+
+Servizi
+
+src/app/api/geo/resolve + search: geocoding (Nominatim) e ricerca località; nessuna persistenza.
+
+src/app/api/calendar/ics/route.ts: genera ICS on-the-fly, nessuna persistenza.
+
+src/app/api/ping/route.ts: healthcheck.
+
+6) Librerie interne (/lib)
+src/lib/planets/runtime.ts
+
+Epemeridi giornaliere (geocentric, ecliptic of-date) per Sole→Plutone con astronomy-engine. Ritorna {name, longitude, sign, retro}; retrogrado determinato confrontando con -1 giorno. Usato da dashboard, lab e People per calcoli rapidi. Nessuna I/O DB.
+
+src/lib/houses/runtime.ts
+
+Helper runtime per le cuspidi delle case: converte Date UTC in JD e delega a computeHouses(system,{jd,latDeg,lonDeg}). Rileva fallbackApplied (es. Placidus oltre ±66.5° → Whole). Nessuna I/O DB.
+
+src/lib/houses/placidus.ts (citata nella KB) & assignHouses
+
+Implementa cuspidi Placidus e un assignHouses robusto (archi non uniformi), usato per assegnare una longitudine ad una casa; frammenti dell’algoritmo di ordering/settore sono in KB. Nessuna I/O DB (persistenza demandata alle API).
+
+src/lib/houses/whole.ts
+
+Calcolo cuspidi Whole Sign a partire dall’ASC (C1 = inizio segno dell’ASC, poi ogni 30°). Nessuna I/O DB.
+
+src/lib/astro.ts (riassunto funzionale)
+
+Motore astrologico: posizioni planetarie (astronomy-engine), ASC/MC, computeHouses(system) (instrada a Placidus o Whole), assegnazione case generica delegata al wrapper Placidus-safe, aspetti natali. È invocato dagli endpoint di compute e transits. Scritture DB avvengono nelle API, non qui.
+
+src/lib/transits.ts (overview)
+
+Calcolo transiti giorno/mese, aspetti e ranking con punteggio per selezione top eventi; usato da /api/transits/* e dal composer. Nessuna scrittura.
+
+src/lib/composer.ts
+
+“Composer” dei testi:
+
+carica i natal points da chart_points,
+
+carica righe da interpretations,
+
+compone uno scheletro (dati, chiavi testo), opzionalmente invoca OpenAI (bypass se AI_BYPASS=true),
+
+funzioni per natal e transiti.
+Usa supabaseAdmin (service role) → solo letture nelle funzioni mostrate; la persistenza delle interpretazioni non è qui.
+
+src/ai/systemPrompts.ts
+
+Prompt system per la chat “chart-aware”: struttura d’output, note di sicurezza, tecnicismi opzionali (SHOW_TECH). Consumata da /api/chat.
+
+7) Schema Database (Supabase)
+
+Estratto tabelle principali (vedi db-schema.json completo nella KB/backups):
+
+birth_data: input nascita (user_id FK→auth.users, date/time/tz/place/lat/lon). Sorgente per compute case/ASC/MC.
+
+chart_points: posizioni natali calcolate (kind/name/longitude/sign/house/retro). Aggiornate dopo ricalcolo case.
+
+house_cusps: 12 righe per sistema (whole|placidus), cusp 1..12 con longitude. Persistite da compute.
+
+natal_aspects: aspetti natali (p1, p2, aspect, orb, strength).
+
+user_prefs: preferenze correnti (house_system, current_*). Upsert via /api/user/prefs.
+
+chat_sessions / chat_messages: storico conversazioni AI (sessione→messaggi).
+
+people / people_chart_points / people_natal_aspects: analoghi per sinastria; compilati via PeoplePanel e /api/people.
+
+transit_events: facoltativa per archiviare eventi-transito con punteggio/orb; non tutti i flussi la utilizzano.
+
+8) Flussi dati tipici
+
+Onboarding → Compute
+
+L’utente salva birth_data e preferenze (user_prefs).
+
+L’endpoint /api/chart/compute calcola cuspidi (computeHouses), aggiorna house_cusps, ricalcola chart_points (incluse case), calcola/aggiorna natal_aspects.
+
+Dashboard Natal
+
+Legge house_system (user_prefs), cusps (house_cusps) o calcola runtime se mancanti, legge chart_points. Render con ChartWheel/ChartWheelPro.
+
+Transiti Giorno/Mese
+
+/api/transits o /api/transits/month calcolano i transiti con astronomy-engine + ranking; UI li mappa alle case natali con assignHouses. Nessuna persistenza salvo eventuale export ICS.
+
+Chat AI “chart-aware”
+
+/api/chat costruisce il contesto da DB (natal/case/transiti), applica il systemPrompt, invia a OpenAI, salva cronologia in chat_sessions/chat_messages.
+
+Sinastria (People)
+
+PeoplePanel//api/people creano people, risolvono luogo, calcolano pianeti natalizi per la persona e inseriscono in people_chart_points (+ aspetti in people_natal_aspects se previsti), poi UI di sinastria li visualizza.
+
+9) Dettagli algoritmici di supporto
+
+Epemeridi: computeDailyPlanets(dateUTC) calcola lon/segno/retro (confronto −1 giorno) per Sole→Plutone (geocentric ecliptic of-date).
+
+Case (runtime): computeHousesForDateUTC({system,dateUTC,latDeg,lonDeg}) → JD + computeHouses; se Placidus a latitudine estrema, segna fallbackApplied (Whole).
+
+Assegnazione case (Placidus-safe): logica di ordering degli archi e test appartenenza settore [start,end) per assegnare house a una longitudine.
+
+10) Script e strumenti
+
+scripts/export-kb.mjs: esporta la KB (kb/_INDEX.md, kb/0001.md, …) escludendo asset binari e chunkando per dimensione.
+
+scripts/gen-db-md.mjs: genera documentazione DB (colonne/PK/FK/commenti) da una connessione DATABASE_URL.
+
+11) Prompt di sistema per la Chat
+
+src/ai/systemPrompts.ts definisce lo stile, la struttura di output, la policy (benessere/entertainment, no claim medici/legali/finanziari) e la sezione facoltativa “Tech notes”. È il riferimento per una chat “chart-aware” che usa esclusivamente i dati passati nel contesto.
+
+12) Nota operativa su /lab
+
+La cartella /lab è un playground sicuro per iterare su componenti “Pro” (es. TransitsWheelPro, ChartWheelPro) e relativa UX (hovering, evidenziazione aspetti/pianeti, stili) senza impattare i file stabili in produzione. Qui si leggono dati reali dell’utente (quando loggato) o si simulano (fallback).
+
+13) Come il chatbot usa il contesto utente
+
+Input: chart_points (natal), house_cusps + user_prefs.house_system (case/assi), transiti (calcolati o passati dalla UI), preferenze utente (focus dominio, lingua, ecc.).
+
+Processo: /api/chat costruisce stringhe CONTEXT_* e applica systemPrompt.
+
+Output: messaggi salvati in chat_sessions/chat_messages.
+
+Allegati utili
+
+Schema completo DB: vedi db-schema.json/backups/db-schema.json (tutte le tabelle, colonne, PK/FK).
+
+Overview funzionali con esempi di flusso: backups/PROJECT_OVERVIEW_23_9.md e backups/PROJECT_OVERVIEW_24_9.md.
+
+14) TL;DR (ruoli chiave)
+
+/app/*: pagine e API Routes; orchestrano calcolo/persistenza e montano i componenti UI.
+
+/components/*: rendering grafico (ruote, pannelli, form); non scrivono su DB.
+
+/lib/*: motori di calcolo (epemeridi, case, transiti) e compositori testo; stateless (persistence nelle API).
+
+DB Supabase: birth_data → chart_points/natal_aspects/house_cusps; chat in chat_*; sinastrie in people_*.

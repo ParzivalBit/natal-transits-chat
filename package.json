@@ -10,10 +10,9 @@
     "export:kb": "node scripts/export-kb.mjs",
     "docs:schema": "node scripts/gen-db-md.mjs"
   },
-
   "dependencies": {
-    "@supabase/ssr": "^0.4.1",
-    "@supabase/supabase-js": "^2.57.4",
+    "@supabase/ssr": "0.7.0",
+    "@supabase/supabase-js": "2.58.0",
     "astronomy-engine": "^2.1.19",
     "geo-tz": "^7.0.7",
     "gh": "^2.8.9",
@@ -30,7 +29,7 @@
   },
   "devDependencies": {
     "@types/luxon": "^3.7.1",
-    "@types/node": "^20.19.15",
+    "@types/node": "^20.19.17",
     "@types/react": "^18.3.24",
     "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.4.21",
@@ -38,6 +37,7 @@
     "eslint-config-next": "14.2.10",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
+    "ts-node": "^10.9.2",
     "typescript": "^5.6.2"
   },
   "type": "module"
