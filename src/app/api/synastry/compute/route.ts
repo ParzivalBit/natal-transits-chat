@@ -1,216 +1,134 @@
 // src/app/api/synastry/compute/route.ts
-import { NextResponse } from 'next/server';
-import { createSupabaseServerRouteClient } from '@/lib/supabaseServer';
-import type { PostgrestError } from '@supabase/supabase-js';
-import { computeSynastryAspects } from '@/lib/synastry/aspects';
-
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// ---- Tipi compatibili con il core grafico/persistenza ----
-type AngleName = 'ASC' | 'MC';
-type PlanetName =
-  | 'Sun' | 'Moon' | 'Mercury' | 'Venus' | 'Mars'
-  | 'Jupiter' | 'Saturn' | 'Uranus' | 'Neptune' | 'Pluto';
+import { NextResponse } from 'next/server';
+import { createSupabaseServerRouteClient } from '@/lib/supabaseServer';
+import { computeSynastryAspects } from '@/lib/synastry/aspects';
+import { type PointName } from '@/lib/astro';
 
-type ChartPoint = {
-  name: PlanetName | AngleName;
-  lon: number;
-  retro?: boolean;
-  sign?: string | null;
-  house?: number | null;
-  who: 'user' | 'person';
-};
-
-// Questo è il formato che vogliamo usare/persistire
-type SynAspect = {
-  p1: PlanetName | AngleName;
-  p2: PlanetName | AngleName;
-  aspect: string;
-  orb: number;
-};
-
-type PointRowUser = {
-  name: string;
-  longitude: number;
-  retro: boolean | null;
-  sign: string | null;
-  house: number | null;
-};
-type PointRowPerson = {
-  name: string;
-  longitude: number;
-  retro: boolean | null;
-};
-
-// Guard nomi validi (pianeti + angoli)
-const VALID_NAMES = new Set<string>([
-  'Sun', 'Moon', 'Mercury', 'Venus', 'Mars',
-  'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto',
-  'ASC', 'MC',
+// punti consentiti (per sicurezza)
+const ALLOWED: ReadonlySet<PointName> = new Set<PointName>([
+  'Sun','Moon','Mercury','Venus','Mars',
+  'Jupiter','Saturn','Uranus','Neptune','Pluto',
+  'ASC','MC',
 ]);
-function toChartPointName(n: string): PlanetName | AngleName | null {
-  return VALID_NAMES.has(n) ? (n as PlanetName | AngleName) : null;
-}
-function isValidName(n: unknown): n is PlanetName | AngleName {
-  return typeof n === 'string' && VALID_NAMES.has(n);
-}
-function isFiniteNum(n: unknown): n is number {
-  return typeof n === 'number' && Number.isFinite(n);
-}
-function isRecord(x: unknown): x is Record<string, unknown> {
-  return typeof x === 'object' && x !== null;
-}
 
-// --- Normalizzazione aspetti dal core (che potrebbe avere nomi diversi) ---
-type CoreA = { p1: unknown; p2: unknown; aspect: unknown; orb: unknown };
-type CoreB = { point1: unknown; point2: unknown; type: unknown; orb: unknown };
-type CoreC = { a: unknown; b: unknown; name: unknown; orb: unknown };
+type RowCP = { name: string; longitude: number };
 
-function isCoreA(x: unknown): x is CoreA {
-  return isRecord(x) && 'p1' in x && 'p2' in x && 'aspect' in x && 'orb' in x;
-}
-function isCoreB(x: unknown): x is CoreB {
-  return isRecord(x) && 'point1' in x && 'point2' in x && 'type' in x && 'orb' in x;
-}
-function isCoreC(x: unknown): x is CoreC {
-  return isRecord(x) && 'a' in x && 'b' in x && 'name' in x && 'orb' in x;
-}
-
-function toSynAspect(x: unknown): SynAspect | null {
-  if (isCoreA(x)) {
-    if (isValidName(x.p1) && isValidName(x.p2) && typeof x.aspect === 'string' && isFiniteNum(x.orb)) {
-      return { p1: x.p1, p2: x.p2, aspect: x.aspect, orb: x.orb };
-    }
-    return null;
-  }
-  if (isCoreB(x)) {
-    if (isValidName(x.point1) && isValidName(x.point2) && typeof x.type === 'string' && isFiniteNum(x.orb)) {
-      return { p1: x.point1, p2: x.point2, aspect: x.type, orb: x.orb };
-    }
-    return null;
-  }
-  if (isCoreC(x)) {
-    if (isValidName(x.a) && isValidName(x.b) && typeof x.name === 'string' && isFiniteNum(x.orb)) {
-      return { p1: x.a, p2: x.b, aspect: x.name, orb: x.orb };
-    }
-    return null;
-  }
-  return null;
-}
-
-// type guard per filtri (da (ChartPoint|null) a ChartPoint)
-function notNull<T>(x: T | null): x is T {
-  return x !== null;
+// Guard per string→PointName
+function isPointName(x: string): x is PointName {
+  return ALLOWED.has(x as PointName);
 }
 
 export async function POST(req: Request) {
   const supabase = createSupabaseServerRouteClient();
 
-  try {
-    const url = new URL(req.url);
-    const persist = url.searchParams.get('persist') === '1';
-
-    const { data: auth } = await supabase.auth.getUser();
-    const userId = auth?.user?.id ?? null;
-    if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-
-    const body = (await req.json().catch(() => ({}))) as { person_id?: string };
-    const person_id = body.person_id ?? '';
-    if (!person_id) return NextResponse.json({ error: 'Missing person_id' }, { status: 400 });
-
-    // Punti utente
-    const selUser = await supabase
-      .from('chart_points')
-      .select('name,longitude,retro,sign,house')
-      .eq('user_id', userId);
-    if (selUser.error) {
-      const e = selUser.error as PostgrestError;
-      return NextResponse.json({ error: e.message, stage: 'user-points' }, { status: 500 });
-    }
-    const uPts = (selUser.data ?? []) as PointRowUser[];
-
-    // Punti persona
-    const selPerson = await supabase
-      .from('people_chart_points')
-      .select('name,longitude,retro')
-      .eq('person_id', person_id);
-    if (selPerson.error) {
-      const e = selPerson.error as PostgrestError;
-      return NextResponse.json({ error: e.message, stage: 'person-points' }, { status: 500 });
-    }
-    const pPts = (selPerson.data ?? []) as PointRowPerson[];
-
-    // Normalizza → ChartPoint[] (tipizziamo esplicitamente la map come (ChartPoint|null)[])
-    const userPointsArr: (ChartPoint | null)[] = uPts.map((p) => {
-      const nm = toChartPointName(p.name);
-      if (!nm) return null;
-      const lon = Number(p.longitude);
-      if (!Number.isFinite(lon)) return null;
-      const cp: ChartPoint = {
-        name: nm,
-        lon,
-        retro: !!p.retro,
-        sign: p.sign,
-        house: p.house,
-        who: 'user',
-      };
-      return cp;
-    });
-    const userPoints: ChartPoint[] = userPointsArr.filter(notNull);
-
-    const personPointsArr: (ChartPoint | null)[] = pPts.map((p) => {
-      const nm = toChartPointName(p.name);
-      if (!nm) return null;
-      const lon = Number(p.longitude);
-      if (!Number.isFinite(lon)) return null;
-      const cp: ChartPoint = {
-        name: nm,
-        lon,
-        retro: !!p.retro,
-        who: 'person',
-      };
-      return cp;
-    });
-    const personPoints: ChartPoint[] = personPointsArr.filter(notNull);
-
-    // Calcolo aspetti (tipo di ritorno del core NON è forzato)
-    const raw = computeSynastryAspects(userPoints, personPoints) as unknown;
-
-    // Normalizzo a { p1, p2, aspect, orb }
-    const aspects: SynAspect[] = Array.isArray(raw)
-      ? (raw.map((x) => toSynAspect(x)).filter((a): a is SynAspect => a !== null))
-      : [];
-
-    // Persistenza opzionale
-    if (persist) {
-      const del = await supabase
-        .from('synastry_aspects')
-        .delete()
-        .eq('user_id', userId)
-        .eq('person_id', person_id);
-      if (del.error) {
-        return NextResponse.json({ error: del.error.message, stage: 'delete' }, { status: 500 });
-      }
-      if (aspects.length > 0) {
-        const rows = aspects.map((a) => ({
-          user_id: userId,
-          person_id,
-          p_user: a.p1,
-          p_person: a.p2,
-          aspect: a.aspect,
-          orb: a.orb,
-        }));
-        const ins = await supabase.from('synastry_aspects').insert(rows);
-        if (ins.error) {
-          return NextResponse.json({ error: ins.error.message, stage: 'insert' }, { status: 500 });
-        }
-      }
-    }
-
-    return NextResponse.json({ ok: true, count: aspects.length, aspects });
-  } catch (e) {
-    const err = e as Error;
-    return NextResponse.json({ error: err?.message ?? 'unknown' }, { status: 500 });
+  // Auth
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
+
+  const url = new URL(req.url);
+  const persist = (url.searchParams.get('persist') ?? '0') !== '0';
+
+  // Body
+  let person_id: string | undefined;
+  try {
+    const json = await req.json().catch(() => ({}));
+    person_id = typeof json?.person_id === 'string' ? json.person_id : undefined;
+  } catch {
+    // noop
+  }
+  if (!person_id) {
+    return NextResponse.json({ ok: false, error: 'missing person_id' }, { status: 400 });
+  }
+
+  // Verifica ownership persona (ed evitiamo 404 silenziosi sotto RLS)
+  const { data: person, error: pErr } = await supabase
+    .from('people')
+    .select('id')
+    .eq('id', person_id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (pErr) return NextResponse.json({ ok: false, error: pErr.message }, { status: 500 });
+  if (!person) return NextResponse.json({ ok: false, error: 'person not found' }, { status: 404 });
+
+  // Carica punti UTENTE
+  const { data: uRaw, error: uErr } = await supabase
+    .from('chart_points')
+    .select('name,longitude')
+    .eq('user_id', user.id);
+  if (uErr) return NextResponse.json({ ok: false, error: uErr.message }, { status: 500 });
+
+  // Carica punti PERSONA
+  const { data: pRaw, error: pPErr } = await supabase
+    .from('people_chart_points')
+    .select('name,longitude')
+    .eq('person_id', person_id);
+  if (pPErr) return NextResponse.json({ ok: false, error: pPErr.message }, { status: 500 });
+
+  const userPts = (uRaw ?? [])
+    .filter((r: RowCP): r is RowCP & { name: PointName } => isPointName(r.name))
+    .map((r) => ({ name: r.name, lon: Number(r.longitude) }));
+
+  const personPts = (pRaw ?? [])
+    .filter((r: RowCP): r is RowCP & { name: PointName } => isPointName(r.name))
+  .map((r) => ({ name: r.name, lon: Number(r.longitude) }));
+
+  if (userPts.length === 0 || personPts.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      computed: 0,
+      persisted: 0,
+      reason: 'missing points',
+    });
+  }
+
+  // Calcola aspetti (usa lib robusta esistente)
+  const aspects = computeSynastryAspects(userPts, personPts, { includeMinor: false });
+
+  // Persistenza opzionale
+  let persisted = 0;
+  if (persist) {
+    // pulizia precedente coppia (user, person)
+    const del = await supabase
+      .from('synastry_aspects')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('person_id', person_id);
+    if (del.error) {
+      return NextResponse.json({ ok: false, error: del.error.message, stage: 'delete' }, { status: 500 });
+    }
+
+    if (aspects.length) {
+      const rows = aspects.map(a => ({
+        user_id: user.id,
+        person_id,
+        p1_owner: 'user',
+        p1_name: a.a.name,  // es. 'Sun','ASC'
+        p2_owner: 'person',
+        p2_name: a.b.name,
+        aspect: a.aspect,    // 'conjunction' | 'sextile' | ...
+        angle: a.exact,      // 0,60,90,120,150,180
+        orb: a.orb,          // distanza in gradi dall'angle "esatto"
+        applying: a.applying ?? null,
+        score: a.score ?? null,
+      }));
+
+      const ins = await supabase.from('synastry_aspects').insert(rows);
+      if (ins.error) {
+        return NextResponse.json({ ok: false, error: ins.error.message, stage: 'insert' }, { status: 500 });
+      }
+      persisted = rows.length;
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    computed: aspects.length,
+    persisted,
+    sample: aspects.slice(0, 5),
+  });
 }
