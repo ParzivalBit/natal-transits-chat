@@ -57,7 +57,7 @@ export default function PeoplePanel({ houseSystem = 'placidus', defaultPerson }:
       const res = await fetch('/api/people', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify({ 
           label: form.label || '',
           date: form.birth_date || '',
           time: form.birth_time || null,
@@ -72,6 +72,7 @@ export default function PeoplePanel({ houseSystem = 'placidus', defaultPerson }:
       const personId = js.id;
       setForm((s) => ({ ...s, id: personId }));
 
+
       // 2) Cuspidi (con fallback solare; se manca ASC e manca Sun in tabella lo approssima)
       const cuRes = await fetch('/api/people/house-cusps/upsert?solar=1', {
         method: 'POST',
@@ -85,6 +86,20 @@ export default function PeoplePanel({ houseSystem = 'placidus', defaultPerson }:
 
       const ok = cuJson as Extract<CuspsResp, { ok: true }>;
       setOkMsg(`Cuspidi salvate: ${ok.count} (${ok.system}${ok.approx ? ', ' + ok.approx : ''})`);
+
+            // 2.5) Calcolo sinastria + persistenza (NON bloccare la UX se fallisce)
+      try {
+        await fetch('/api/synastry/compute?persist=1', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ person_id: personId }),
+        });
+      } catch (e) {
+        // Log silenzioso: la pagina /lab/people-pro/[id] ricalcolerà comunque on-load
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[synastry/compute] non critico:', e);
+        }
+      }
 
       // 3) Redirect alla pagina sinastria
       router.push(`/lab/people-pro/${personId}`);

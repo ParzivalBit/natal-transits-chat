@@ -2,18 +2,12 @@
 
 | File | Bytes |
 |---|---:|
+| `backups\db-schema.json` | 29861 |
+| `backups\PROJECT_OVERIVIEW_25_9.MD` | 12925 |
 | `backups\PROJECT_OVERVIEW_23_9.md` | 12042 |
 | `backups\PROJECT_OVERVIEW_24_9.md` | 10052 |
 | `backups\PROJECT_OVERVIEW.md` | 3559 |
 | `eslint.config.mjs` | 549 |
-| `kb\_INDEX.md` | 4859 |
-| `kb\0001.md` | 82274 |
-| `kb\0002.md` | 358424 |
-| `kb\0003.md` | 151822 |
-| `kb\0004.md` | 151417 |
-| `kb\0005.md` | 138530 |
-| `kb\db-schema.json` | 24364 |
-| `kb\PROJECT_OVERIVIEW_25_9.MD` | 12925 |
 | `next-env.d.ts` | 233 |
 | `package-lock.json` | 364283 |
 | `package.json` | 1128 |
@@ -26,7 +20,7 @@
 | `src\app\api\auth\set-session\route.ts` | 1253 |
 | `src\app\api\auth\signout\route.ts` | 554 |
 | `src\app\api\calendar\ics\route.ts` | 1881 |
-| `src\app\api\chart\compute\route.ts` | 9359 |
+| `src\app\api\chart\compute\route.ts` | 13139 |
 | `src\app\api\chat\route.ts` | 6185 |
 | `src\app\api\compat\[id]\route.ts` | 16902 |
 | `src\app\api\debug\whoami\route.ts` | 958 |
@@ -36,12 +30,13 @@
 | `src\app\api\interpret\natal\route.ts` | 1615 |
 | `src\app\api\interpret\transits\route.ts` | 2642 |
 | `src\app\api\people\[id]\route.ts` | 1116 |
-| `src\app\api\people\house-cusps\upsert\route.ts` | 8844 |
+| `src\app\api\people\house-cusps\upsert\route.ts` | 7939 |
 | `src\app\api\people\points\minimal\route.ts` | 4201 |
+| `src\app\api\people\points\upsert\route.ts` | 7144 |
 | `src\app\api\people\route.ts` | 4019 |
-| `src\app\api\people\upsert\route.ts` | 1840 |
+| `src\app\api\people\upsert\route.ts` | 8520 |
 | `src\app\api\ping\route.ts` | 135 |
-| `src\app\api\synastry\compute\route.ts` | 3305 |
+| `src\app\api\synastry\compute\route.ts` | 7331 |
 | `src\app\api\transits\month\route.ts` | 7314 |
 | `src\app\api\transits\route.ts` | 7778 |
 | `src\app\api\user\prefs\route.ts` | 1943 |
@@ -65,7 +60,7 @@
 | `src\app\lab\daily-pro\sbServer.ts` | 0 |
 | `src\app\lab\natal-pro\page.tsx` | 3100 |
 | `src\app\lab\people-pro\[id]\ChatSynastryPane.tsx` | 3058 |
-| `src\app\lab\people-pro\[id]\page.tsx` | 12968 |
+| `src\app\lab\people-pro\[id]\page.tsx` | 7547 |
 | `src\app\lab\people-pro\page.tsx` | 1200 |
 | `src\app\lab\transits-pro\ClientTransitsPro.tsx` | 3653 |
 | `src\app\lab\transits-pro\page.tsx` | 5551 |
@@ -77,7 +72,7 @@
 | `src\components\astro\css\proTheme.css` | 1053 |
 | `src\components\astro\DailySkyWheelPro.tsx` | 12760 |
 | `src\components\astro\DailyWheelPro.tsx` | 3231 |
-| `src\components\astro\SynastryWheelPro.tsx` | 14051 |
+| `src\components\astro\SynastryWheelPro.tsx` | 13074 |
 | `src\components\astro\TransitsWheelPro.tsx` | 21044 |
 | `src\components\AuthForm.tsx` | 4284 |
 | `src\components\BirthForm.tsx` | 7632 |
@@ -89,7 +84,7 @@
 | `src\components\MonthTransitsList.tsx` | 5335 |
 | `src\components\MoonPhaseCard.tsx` | 1272 |
 | `src\components\PeopleList.tsx` | 2017 |
-| `src\components\PeoplePanel.tsx` | 6621 |
+| `src\components\PeoplePanel.tsx` | 6162 |
 | `src\components\PersonForm.tsx` | 5289 |
 | `src\components\SignOutButton.tsx` | 316 |
 | `src\components\sinastriatest.tsx` | 0 |
@@ -101,7 +96,7 @@
 | `src\lib\composer.ts` | 9472 |
 | `src\lib\geo.ts` | 4888 |
 | `src\lib\graphics\glyphs.ts` | 3682 |
-| `src\lib\graphics\polar.ts` | 2623 |
+| `src\lib\graphics\polar.ts` | 3935 |
 | `src\lib\graphics\tokens.ts` | 1456 |
 | `src\lib\graphics\types.ts` | 285 |
 | `src\lib\houses\common.ts` | 1798 |
@@ -117,6 +112,7 @@
 | `src\lib\synastry.ts` | 3129 |
 | `src\lib\synastry\aspects.ts` | 5641 |
 | `src\lib\time.ts` | 617 |
+| `src\lib\time\resolveTz.ts` | 1221 |
 | `src\lib\transits.ts` | 5730 |
 | `src\lib\utils.ts` | 157 |
 | `src\types\tz-lookup.d.ts` | 107 |

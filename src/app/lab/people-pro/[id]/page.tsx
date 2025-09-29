@@ -130,30 +130,21 @@ export default async function Page({
 
   const { data: aspectsRaw } = await supabase
     .from('synastry_aspects')
-    .select('a_owner,a_name,b_owner,b_name,aspect,exact,applying,score')
-    .eq('person_id', personId) as unknown as {
-      data: {
-        a_owner: 'user'|'person';
-        a_name: string;
-        b_owner: 'user'|'person';
-        b_name: string;
-        aspect: SAspectType;
-        exact: boolean | null;
-        applying: boolean | null;
-        score: number | null;
-      }[] | null
-    };
+    .select('p1_owner,p1_name,p2_owner,p2_name,aspect,angle,orb,applying,score')
+    .eq('user_id', userId)     // importante se vuoi solo la coppia dell’utente loggato
+    .eq('person_id', personId);
 
   const aspects: SAspect[] = (aspectsRaw ?? [])
-    .filter(r => isPlanetOrAngle(r.a_name) && isPlanetOrAngle(r.b_name))
+    .filter(r => isPlanetOrAngle(r.p1_name) && isPlanetOrAngle(r.p2_name))
     .map(r => ({
-      a: { owner: r.a_owner, name: r.a_name as PlanetOrAngle },
-      b: { owner: r.b_owner, name: r.b_name as PlanetOrAngle },
-      aspect: r.aspect,
-      exact: !!r.exact,
-      applying: !!r.applying,
+      a: { owner: r.p1_owner as 'user'|'person', name: r.p1_name as PlanetOrAngle },
+      b: { owner: r.p2_owner as 'user'|'person', name: r.p2_name as PlanetOrAngle },
+      aspect: r.aspect as SAspectType,
+      // 'exact' è opzionale nel componente; lasciamo undefined
+      applying: r.applying ?? undefined,
       score: r.score ?? undefined,
     }));
+
 
   // ----- Scegli le case da mostrare in base al "system" -----
   const housesUser   = chosenSystem === 'placidus' ? (uPlac ?? undefined) : (uWhole ?? undefined);
