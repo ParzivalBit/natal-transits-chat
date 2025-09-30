@@ -50,18 +50,21 @@ export type SynastryWheelProProps = {
   size?: number;
   responsive?: boolean;
   className?: string;
+  orientation?: 'ccw' | 'cw';
   zodiacPhaseDeg?: number; // offset solo per la fascia zodiacale (default 0). Metti 180 per "ribaltarla".
-
-  /** lunghezza delle tacche che indicano dove cade un pianeta (px) */
-  tickSize?: number;
-
-  /** controllo fine dei raggi (opzionale) */
-  radiiOverrides?: Partial<Parameters<typeof getProRadii>[0]>;
+  tickSize?: number; /** lunghezza delle tacche che indicano dove cade un pianeta (px) */
+  userGlyphOffset?: number;   // px, positivo = verso il centro
+  personGlyphOffset?: number; // px, positivo = verso il centro
+  radiiOverrides?: Partial<Parameters<typeof getProRadii>[0]>; /** controllo fine dei raggi (opzionale) */
 };
 
 // ---------- Utility ----------
 const norm360 = (d: number) => ((d % 360) + 360) % 360;
 const pKey = (owner: 'user'|'person', name: PlanetOrAngle) => `${owner}:${name}`;
+// micro-offset per centrare otticamente glifo e cerchio hover
+const GLYPH_DX = 0;     // se vedi un lieve disallineamento orizzontale, regola di ±0.5
+const GLYPH_DY = 0.5;   // 0.5–1px spesso basta per la Luna
+
 
 // ---------- Component ----------
 export default function SynastryWheelPro({
@@ -73,12 +76,15 @@ export default function SynastryWheelPro({
   className,
   tickSize = 12,                 // <— parametrico
   radiiOverrides,
-  zodiacPhaseDeg = 180,
+  orientation = 'ccw',
+  zodiacPhaseDeg = 0,
+  userGlyphOffset = 6,        // prova 6–10 px
+  personGlyphOffset = 0,
 }: SynastryWheelProProps) {
 
   // colori e grid come prima
-  const COLOR_USER = '#1d4ed8';    // blu
-  const COLOR_PERSON = '#f59e0b';  // arancione
+  const COLOR_USER = '#0284c7';    // blu
+  const COLOR_PERSON = '#ea580c';  // arancione
   const GRID = '#6b7280';
   const GRID_MID = '#9ca3af';
   const GRID_LIGHT = '#e5e7eb';
@@ -112,18 +118,33 @@ export default function SynastryWheelPro({
   const R_ASPECT     = radii.aspectogramRadius;
   const R_CENTER     = R_ASPECT * 0.77; // simile al tuo
 
-  // Rotazione: ASC utente a sinistra (ore 9)
-  const rot = useMemo(() => norm360(270 - (user.axes?.asc ?? 180)), [user.axes?.asc]);
-  const applyRot = useCallback((deg: number) => norm360(deg + rot), [rot]);
+    // Rotazione/Orientamento globale:
+  // - mettiamo l'ASC utente a sinistra (ore 9) via rot
+  // - orientamento antiorario (dir = -1) o orario (dir = +1)
+  const dir = orientation === 'ccw' ? -1 : 1;
+  const asc0 = user.axes?.asc ?? 180;
+
+  // IMPORTANTISSIMO: scegli rot in modo che toViewAngle(ASC) = 270° (ore 9) per QUALSIASI 'dir'
+  const rot = useMemo(() => norm360(270 - dir * asc0), [asc0, dir]);
+
+  const toViewAngle = useCallback((deg: number) => {
+    return norm360(rot + dir * deg);
+  }, [rot, dir]);
+
+  // Per la sola fascia zodiacale puoi voler applicare una micro-fase opzionale
+  const toZodiacAngle = useCallback((deg: number) => {
+    return toViewAngle(deg + zodiacPhaseDeg);
+  }, [toViewAngle, zodiacPhaseDeg]);
+
 
   // Pianeti con theta ruotato
   const userPts = useMemo<PtWithTheta[]>(
-    () => user.points.map(p => ({ ...p, theta: applyRot(norm360(p.lon)) })),
-    [user.points, applyRot]
+    () => user.points.map(p => ({ ...p, theta: toViewAngle(norm360(p.lon)) })),
+    [user.points, toViewAngle]
   );
   const personPts = useMemo<PtWithTheta[]>(
-    () => person.points.map(p => ({ ...p, theta: applyRot(norm360(p.lon)) })),
-    [person.points, applyRot]
+    () => person.points.map(p => ({ ...p, theta: toViewAngle(norm360(p.lon)) })),
+    [person.points, toViewAngle]
   );
 
   // Hover state
@@ -161,22 +182,22 @@ export default function SynastryWheelPro({
   // ---------- Labeling anti-overlap (radial staggering) ----------
   const userDisp = useMemo(() => {
     // baseR: centro dell'anello user
-    const baseR = (R_USER_OUT + R_USER_IN) / 2;
+    const baseR = (R_USER_OUT + R_USER_IN) / 2  - userGlyphOffset;  // <-- offset
     return radialStagger(
       userPts.map(p => ({ name: p.name, lon: p.theta, baseR })), // NB: lon = theta (ruotato)
       2.0,  // min distanza angolare (°) per salire di livello
       8,    // incremento raggio per livello
       3     // max livelli
     );
-  }, [userPts, R_USER_IN, R_USER_OUT]);
+  }, [R_USER_OUT, R_USER_IN, userGlyphOffset, userPts]);
 
   const personDisp = useMemo(() => {
-    const baseR = (R_PERSON_OUT + R_PERSON_IN) / 2;
+    const baseR = (R_PERSON_OUT + R_PERSON_IN) / 2  - personGlyphOffset;  // <-- offset
     return radialStagger(
       personPts.map(p => ({ name: p.name, lon: p.theta, baseR })),
       2.7, 8, 5
     );
-  }, [personPts, R_PERSON_IN, R_PERSON_OUT]);
+  }, [R_PERSON_OUT, R_PERSON_IN, personGlyphOffset, personPts]);
 
   // ---------- Render helpers ----------
   const SignGlyph = ({ sign, sizePx }: { sign: ZodiacSign; sizePx: number }) => (
@@ -191,8 +212,6 @@ export default function SynastryWheelPro({
   );
 
   function drawZodiac() {
-    const applyRotZ = (deg: number) => applyRot(norm360(deg + zodiacPhaseDeg));
-
     const nodes: React.ReactNode[] = [];
     for (let i = 0; i < 12; i++) {
       const sign = ([
@@ -200,8 +219,8 @@ export default function SynastryWheelPro({
         'Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces',
       ] as ZodiacSign[])[i]!;
 
-      const start = applyRotZ(i * 30);           // <-- usa applyRotZ
-      const mid   = applyRotZ(i * 30 + 15);      // <-- usa applyRotZ
+      const start = toZodiacAngle(i * 30);
+      const mid   = toZodiacAngle(i * 30 + 15);
       const t1 = polarToXY(CX, CY, R_ZOD_OUT, start);
       const t2 = polarToXY(CX, CY, R_ZOD_IN,  start);
       const g  = polarToXY(CX, CY, (R_ZOD_OUT + R_ZOD_IN) / 2, mid);
@@ -235,7 +254,7 @@ export default function SynastryWheelPro({
     for (let i = 0; i < 12; i++) {
       const v = cusps[i]!;
       const next = cusps[(i + 1) % 12]!;
-      const a = applyRot(v);
+      const a = toViewAngle(v);
       const pOut = polarToXY(CX, CY, rOuter, a);
       const pIn  = polarToXY(CX, CY, rInner, a);
 
@@ -244,7 +263,7 @@ export default function SynastryWheelPro({
       );
 
       const arc = (next - v + 360) % 360;
-      const mid = applyRot(v + arc / 2);
+      const mid = toViewAngle(v + arc / 2);
       const labelR = putNumbersInside ? rMid - 10 : rMid + 10;
       const lp = polarToXY(CX, CY, labelR, mid);
       labels.push(
@@ -265,46 +284,105 @@ export default function SynastryWheelPro({
     );
   }
 
- function drawAxes(ax: Axes | undefined, color: string, flipMC = true) {
-  if (!ax) return null;
+  function drawAxes(ax: Axes | undefined, color: string, opts?: {
+    showOpposites?: boolean;
+    flipMC?: boolean;         // se vuoi davvero forzare il MC "in alto", lascialo opzionale
+    tickOuterPad?: number;
+    tickInnerPad?: number;
+    labelPad?: number;
+  }) {
+    if (!ax) return null;
+    const {
+      showOpposites = true,
+      flipMC = false,           // <— DEFAULT: NIENTE FLIP (evita inversione di segni)
+      tickOuterPad = 6,
+      tickInnerPad = 6,
+      labelPad = 12,
+    } = opts ?? {};
 
-  // ASC resta invariato
-  const asc = applyRot(ax.asc);
+    // Angoli geometrici (niente aggiustamenti sui segni)
+    const ascRaw = ax.asc;
+    const mcRaw  = flipMC ? ax.mc + 180 : ax.mc;  // se proprio vuoi forzare MC "in alto", usa flipMC=true
+    const dcRaw  = ascRaw + 180;
+    const icRaw  = mcRaw + 180;
 
-  // MC: se flipMC === true lo ribaltiamo di 180° (MC va in alto, IC in basso)
-  const mcRaw = flipMC ? norm360(ax.mc + 180) : ax.mc;
-  const mc = applyRot(mcRaw);
+    // Proiezione
+    const asc = toViewAngle(ascRaw);
+    const mc  = toViewAngle(mcRaw);
+    const dc  = toViewAngle(dcRaw);
+    const ic  = toViewAngle(icRaw);
 
-  const A1 = polarToXY(CX, CY, R_ZOD_OUT + 6, asc);
-  const A2 = polarToXY(CX, CY, R_ZOD_IN - 6, asc);
-  const M1 = polarToXY(CX, CY, R_ZOD_OUT + 6, mc);
-  const M2 = polarToXY(CX, CY, R_ZOD_IN - 6, mc);
+    // Segmenti (stesso schema di prima)
+    const A1 = polarToXY(CX, CY, R_ZOD_OUT + tickOuterPad, asc);
+    const A2 = polarToXY(CX, CY, R_ZOD_IN  - tickInnerPad, asc);
 
-  const AcLab = polarToXY(CX, CY, R_ZOD_OUT + 12, asc);
-  const McLab = polarToXY(CX, CY, R_ZOD_OUT + 12, mc);
+    const M1 = polarToXY(CX, CY, R_ZOD_OUT + tickOuterPad, mc);
+    const M2 = polarToXY(CX, CY, R_ZOD_IN  - tickInnerPad, mc);
 
-  return (
-    <g>
-      <line x1={A1.x} y1={A1.y} x2={A2.x} y2={A2.y} stroke={color} strokeWidth={1.2} />
-      <line x1={M1.x} y1={M1.y} x2={M2.x} y2={M2.y} stroke={color} strokeWidth={1.2} />
-      <text x={AcLab.x} y={AcLab.y} fontSize={11} fill={color} textAnchor="middle" dominantBaseline="middle" style={{ fontWeight: 600 }}>AC</text>
-      <text x={McLab.x} y={McLab.y} fontSize={11} fill={color} textAnchor="middle" dominantBaseline="middle" style={{ fontWeight: 600 }}>MC</text>
-    </g>
-  );
-}
+    const D1 = polarToXY(CX, CY, R_ZOD_OUT + tickOuterPad, dc);
+    const D2 = polarToXY(CX, CY, R_ZOD_IN  - tickInnerPad, dc);
+
+    const I1 = polarToXY(CX, CY, R_ZOD_OUT + tickOuterPad, ic);
+    const I2 = polarToXY(CX, CY, R_ZOD_IN  - tickInnerPad, ic);
+
+    // Label positions
+    const AcLab = polarToXY(CX, CY, R_ZOD_OUT + labelPad, asc);
+    const McLab = polarToXY(CX, CY, R_ZOD_OUT + labelPad, mc);
+    const DcLab = polarToXY(CX, CY, R_ZOD_OUT + labelPad, dc);
+    const IcLab = polarToXY(CX, CY, R_ZOD_OUT + labelPad, ic);
+
+    return (
+      <g>
+        {/* AC / MC */}
+        <line x1={A1.x} y1={A1.y} x2={A2.x} y2={A2.y} stroke={color} strokeWidth={1.2} />
+        <line x1={M1.x} y1={M1.y} x2={M2.x} y2={M2.y} stroke={color} strokeWidth={1.2} />
+        <text x={AcLab.x} y={AcLab.y} fontSize={11} fill={color} textAnchor="middle" dominantBaseline="middle" style={{ fontWeight: 600 }}>AC</text>
+        <text x={McLab.x} y={McLab.y} fontSize={11} fill={color} textAnchor="middle" dominantBaseline="middle" style={{ fontWeight: 600 }}>MC</text>
+
+        {/* DC / IC (opposti) */}
+        {showOpposites && (
+          <>
+            <line x1={D1.x} y1={D1.y} x2={D2.x} y2={D2.y} stroke={color} strokeOpacity={0.7} strokeWidth={1.1} />
+            <line x1={I1.x} y1={I1.y} x2={I2.x} y2={I2.y} stroke={color} strokeOpacity={0.7} strokeWidth={1.1} />
+            <text x={DcLab.x} y={DcLab.y} fontSize={10} fill={color} opacity={0.85} textAnchor="middle" dominantBaseline="middle" style={{ fontVariant: 'small-caps' }}>DC</text>
+            <text x={IcLab.x} y={IcLab.y} fontSize={10} fill={color} opacity={0.85} textAnchor="middle" dominantBaseline="middle" style={{ fontVariant: 'small-caps' }}>IC</text>
+          </>
+        )}
+      </g>
+    );
+  }
 
 
   // Tacche dei pianeti: ora parametrizzate da tickSize
-  function drawPlanetTicks(points: { theta: number }[], color: string) {
-    const nodes: React.ReactNode[] = [];
-    for (let i = 0; i < points.length; i++) {
-      const th = points[i]!.theta;
-      const a  = polarToXY(CX, CY, R_ZOD_IN, th);
-      const b  = polarToXY(CX, CY, R_ZOD_IN - tickSize, th);
-      nodes.push(<line key={`pt-${color}-${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={1} strokeOpacity={0.55}/>);
-    }
-    return <g>{nodes}</g>;
+function drawPlanetTicksLabeled(
+  pts: PtWithTheta[],              // deve contenere name + theta
+  owner: 'user' | 'person',
+  color: string,
+  hiSet: Set<string>,              // set di chiavi evidenziate es. "user:Sun"
+  baseTick = tickSize              // usa la prop già introdotta
+) {
+  const nodes: React.ReactNode[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!;
+    const key = `${owner}:${p.name}`;
+    const th  = p.theta;
+    const a   = polarToXY(CX, CY, R_ZOD_IN, th);
+    const len = hiSet.has(key) ? baseTick + 4 : baseTick; // tacca più lunga se evidenziata
+    const w   = hiSet.has(key) ? 2 : 1;                   // e più spessa
+    const b   = polarToXY(CX, CY, R_ZOD_IN - len, th);
+    nodes.push(
+      <line
+        key={`pt-${owner}-${i}`}
+        x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+        stroke={color}
+        strokeWidth={w}
+        strokeOpacity={hiSet.has(key) ? 0.95 : 0.55}
+      />
+    );
   }
+  return <g>{nodes}</g>;
+}
+
 
   // Disegna glifi usando il raggio “staggered” ma lascia le tacche al raggio base
   function drawPlanets(
@@ -327,8 +405,15 @@ export default function SynastryWheelPro({
               onMouseEnter={() => setHover({ kind:'planet', key })}
               onMouseLeave={() => setHover(null)}
               style={{ cursor: 'pointer' }}>
-              {isActive && <circle cx={0} cy={0} r={12} fill="none" stroke={color} strokeWidth={1.5} />}
-              <text /* ...come prima... */>{planetChar(p.name as PlanetName)}</text>
+              {isActive && <circle cx={GLYPH_DX} cy={GLYPH_DY} r={12} fill="none" stroke={color} strokeWidth={1.5} />}
+              <text x={GLYPH_DX}
+                y={GLYPH_DY}
+                fontSize={16}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill={color}
+                fontFamily='"Noto Sans Symbols 2","Segoe UI Symbol","Apple Symbols","DejaVu Sans",sans-serif'
+                aria-label={p.name}>{planetChar(p.name as PlanetName)}</text>
             </g>
           );
         })}
@@ -391,7 +476,7 @@ export default function SynastryWheelPro({
     <div className={className}>
       <svg viewBox={`0 0 ${size} ${size}`} className={responsive ? 'h-auto w-full' : undefined} role="img" aria-label="Synastry Pro Wheel">
         {/* sfondo leggero */}
-        <circle cx={CX} cy={CY} r={r-1} fill="#f8fafc" stroke="#e5e7eb" />
+        <circle cx={CX} cy={CY} r={r-1} fill="#ffffffff" stroke="#ffffffff" />
 
         {/* fascia segni */}
         {drawZodiac()}
@@ -403,12 +488,14 @@ export default function SynastryWheelPro({
         {drawHouseBand(person.houses, COLOR_PERSON, R_PERSON_OUT, R_PERSON_IN, true)}
 
         {/* assi */}
-        {drawAxes(axesUser, COLOR_USER, true)}
-        {drawAxes(axesPerson, COLOR_PERSON, true)}
+        {drawAxes(axesUser, COLOR_USER,   { showOpposites: true, flipMC: false })}
+        {drawAxes(axesPerson, COLOR_PERSON,{ showOpposites: true, flipMC: false })}
+
 
         {/* tacche verticali per ogni pianeta sotto la fascia segni (dimensione configurabile) */}
-        {drawPlanetTicks(userPts, COLOR_USER)}
-        {drawPlanetTicks(personPts, COLOR_PERSON)}
+        {/* tacche verticali sotto la fascia segni */}
+        {drawPlanetTicksLabeled(userPts, 'user', COLOR_USER, highlighted)}
+        {drawPlanetTicksLabeled(personPts, 'person', COLOR_PERSON, highlighted)}
 
         {/* aspetti al centro */}
         {drawAspects(aspects)}

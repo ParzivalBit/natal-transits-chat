@@ -1,12 +1,8 @@
 // src/app/lab/people-pro/[id]/page.tsx
+
 import { headers } from 'next/headers';
-import SynastryWheelPro, {
-  type PlanetOrAngle,
-  type ChartPoint,
-  type SAspect,
-  type SAspectType,
-} from '@/components/astro/SynastryWheelPro';
 import { createSupabaseServerComponentClient } from '@/lib/supabaseServer';
+import SynastryPeopleProClient from './SynastryPeopleProClient';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,29 +10,39 @@ export const runtime = 'nodejs';
 type HouseRow = { longitude: number };
 type CPRow = { name: string; longitude: number; retro: boolean | null; sign?: string | null; house?: number | null };
 
-// Limiti nomi
+type PlanetNameStrict =
+  | 'Sun' | 'Moon' | 'Mercury' | 'Venus' | 'Mars'
+  | 'Jupiter' | 'Saturn' | 'Uranus' | 'Neptune' | 'Pluto';
+type AngleName = 'ASC' | 'MC';
+type PlanetOrAngle = PlanetNameStrict | AngleName;
+
+type ChartPoint = {
+  name: PlanetOrAngle;
+  lon: number;           // 0..360
+  retro?: boolean;
+  sign?: string | null;
+  house?: number | null;
+};
+
+type SAspectType = 'conjunction' | 'sextile' | 'square' | 'trine' | 'opposition';
+
+type AspectRow = {
+  p1_owner: 'user'|'person';
+  p1_name: string;
+  p2_owner: 'user'|'person';
+  p2_name: string;
+  aspect: SAspectType;
+  angle: number | null;            // es. 0,60,90,120,180
+  orb: number | null;              // distanza dall'angolo esatto (±gradi)
+  applying: boolean | null;
+  score: number | null;
+};
+
 const PLANETS: ReadonlySet<string> = new Set([
   'Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto',
   'ASC','MC',
 ]);
 const isPlanetOrAngle = (x: string): x is PlanetOrAngle => PLANETS.has(x);
-
-async function serverPostWithCookies(path: string, body: Record<string, unknown>) {
-  const h = headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
-  const proto = h.get('x-forwarded-proto') ?? 'https';
-  const origin = `${proto}://${host}`;
-  const res = await fetch(`${origin}${path}`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      cookie: h.get('cookie') ?? '',
-    },
-    body: JSON.stringify(body),
-    cache: 'no-store',
-  });
-  return res;
-}
 
 function to12(rows: HouseRow[] | null | undefined): number[] | undefined {
   const xs = (rows ?? []).map(r => Number(r.longitude)).filter(n => Number.isFinite(n));
@@ -63,27 +69,55 @@ async function fetchHousesForUser(supabase: ReturnType<typeof createSupabaseServ
   return to12(data);
 }
 
+async function serverPostWithCookies(path: string, body: Record<string, unknown>) {
+  const h = headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
+  const proto = h.get('x-forwarded-proto') ?? 'https';
+  const origin = `${proto}://${host}`;
+  const res = await fetch(`${origin}${path}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie: h.get('cookie') ?? '',
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+  return res;
+}
+
 export default async function Page({
   params,
   searchParams,
 }: {
   params: { id: string },
-  searchParams?: { system?: string }
+  searchParams?: { system?: string; cj?: string; sx?: string; sq?: string; tr?: string; op?: string; orb?: string }
 }) {
   const personId = params.id;
   const chosenSystem: 'placidus'|'whole' = searchParams?.system === 'whole' ? 'whole' : 'placidus';
+
+  // flags iniziali (da URL; default ON)
+  const initialFlags = {
+    conjunction: searchParams?.cj !== '0',
+    sextile:     searchParams?.sx !== '0',
+    square:      searchParams?.sq !== '0',
+    trine:       searchParams?.tr !== '0',
+    opposition:  searchParams?.op !== '0',
+  };
+  const rawOrbOffset = Number(searchParams?.orb ?? 0);
+  const initialOrbOffset = Number.isFinite(rawOrbOffset) ? rawOrbOffset : 0;
 
   const supabase = createSupabaseServerComponentClient();
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth?.user?.id ?? null;
 
-  // ----- USER houses: preleva entrambe -----
+  // USER houses
   const [uPlac, uWhole] = await Promise.all([
     userId ? fetchHousesForUser(supabase, userId, 'placidus') : Promise.resolve(undefined),
     userId ? fetchHousesForUser(supabase, userId, 'whole')    : Promise.resolve(undefined),
   ]);
 
-  // ----- PERSON houses: preleva entrambe; se mancano prova a calcolare -----
+  // PERSON houses (compute se mancano)
   let pPlac = await fetchHousesForPerson(supabase, personId, 'placidus');
   let pWhole = await fetchHousesForPerson(supabase, personId, 'whole');
 
@@ -96,7 +130,7 @@ export default async function Page({
     if (res.ok) pWhole = await fetchHousesForPerson(supabase, personId, 'whole');
   }
 
-  // ----- Points -----
+  // Points
   const { data: userPtsRaw } = await supabase
     .from('chart_points')
     .select('name,longitude,retro,sign,house')
@@ -125,62 +159,36 @@ export default async function Page({
       retro: !!p.retro,
     }));
 
-  // ----- Aspects (assicurati che siano aggiornati e poi leggi) -----
-  await serverPostWithCookies('/api/synastry/compute?persist=1', { person_id: personId });
+  // Assicura aspetti aggiornati (persistenza server, ma la UI filtrerà live)
+  await serverPostWithCookies('/api/synastry/compute?persist=1', {
+    person_id: personId,
+    enabled: initialFlags,
+    orbOffset: initialOrbOffset,
+  });
 
+  // Leggi aspetti “grezzi” (con orb numerico)
   const { data: aspectsRaw } = await supabase
     .from('synastry_aspects')
     .select('p1_owner,p1_name,p2_owner,p2_name,aspect,angle,orb,applying,score')
-    .eq('user_id', userId)     // importante se vuoi solo la coppia dell’utente loggato
-    .eq('person_id', personId);
+    .eq('user_id', userId)
+    .eq('person_id', personId) as unknown as { data: AspectRow[] | null };
 
-  const aspects: SAspect[] = (aspectsRaw ?? [])
-    .filter(r => isPlanetOrAngle(r.p1_name) && isPlanetOrAngle(r.p2_name))
-    .map(r => ({
-      a: { owner: r.p1_owner as 'user'|'person', name: r.p1_name as PlanetOrAngle },
-      b: { owner: r.p2_owner as 'user'|'person', name: r.p2_name as PlanetOrAngle },
-      aspect: r.aspect as SAspectType,
-      // 'exact' è opzionale nel componente; lasciamo undefined
-      applying: r.applying ?? undefined,
-      score: r.score ?? undefined,
-    }));
-
-
-  // ----- Scegli le case da mostrare in base al "system" -----
+  // Case scelte
   const housesUser   = chosenSystem === 'placidus' ? (uPlac ?? undefined) : (uWhole ?? undefined);
   const housesPerson = chosenSystem === 'placidus' ? (pPlac ?? undefined) : (pWhole ?? undefined);
 
-  // Assi derivati (I e X)
   const axesUser   = housesUser   ? { asc: housesUser[0]!,   mc: housesUser[9]! }   : undefined;
   const axesPerson = housesPerson ? { asc: housesPerson[0]!, mc: housesPerson[9]! } : undefined;
 
-  // ----- UI -----
   return (
-    <div className="px-4 py-6">
-      <div className="mb-3 flex items-center gap-3">
-        <form method="get" className="flex items-center gap-2">
-          <label htmlFor="system" className="text-sm text-gray-700">Sistema case:</label>
-          <select id="system" name="system" defaultValue={chosenSystem} className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm">
-            <option value="placidus">Placidus</option>
-            <option value="whole">Whole Sign</option>
-          </select>
-          <button type="submit" className="rounded-md bg-gray-900 px-3 py-1 text-sm text-white">Aggiorna</button>
-        </form>
-        <div className="text-xs text-gray-500">
-          Mostrando: <b>{chosenSystem === 'placidus' ? 'Placidus' : 'Whole Sign'}</b>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-        <div className="mx-auto w-full max-w-[860px]">
-          <SynastryWheelPro
-            user={{ points: userPts, houses: housesUser, axes: axesUser }}
-            person={{ points: personPts, houses: housesPerson, axes: axesPerson }}
-            aspects={aspects}
-            responsive
-          />
-        </div>
-      </div>
-    </div>
+    <SynastryPeopleProClient
+      personId={personId}
+      chosenSystem={chosenSystem}
+      user={{ points: userPts, houses: housesUser, axes: axesUser }}
+      person={{ points: personPts, houses: housesPerson, axes: axesPerson }}
+      aspectsRaw={aspectsRaw ?? []}
+      initialFlags={initialFlags}
+      initialOrbOffset={initialOrbOffset}
+    />
   );
 }

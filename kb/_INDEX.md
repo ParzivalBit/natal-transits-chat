@@ -6,6 +6,7 @@
 | `backups\PROJECT_OVERIVIEW_25_9.MD` | 12925 |
 | `backups\PROJECT_OVERVIEW_23_9.md` | 12042 |
 | `backups\PROJECT_OVERVIEW_24_9.md` | 10052 |
+| `backups\PROJECT_OVERVIEW_29_09.md` | 15208 |
 | `backups\PROJECT_OVERVIEW.md` | 3559 |
 | `eslint.config.mjs` | 549 |
 | `next-env.d.ts` | 233 |
@@ -36,7 +37,7 @@
 | `src\app\api\people\route.ts` | 4019 |
 | `src\app\api\people\upsert\route.ts` | 8520 |
 | `src\app\api\ping\route.ts` | 135 |
-| `src\app\api\synastry\compute\route.ts` | 7331 |
+| `src\app\api\synastry\compute\route.ts` | 4475 |
 | `src\app\api\transits\month\route.ts` | 7314 |
 | `src\app\api\transits\route.ts` | 7778 |
 | `src\app\api\user\prefs\route.ts` | 1943 |
@@ -60,7 +61,8 @@
 | `src\app\lab\daily-pro\sbServer.ts` | 0 |
 | `src\app\lab\natal-pro\page.tsx` | 3100 |
 | `src\app\lab\people-pro\[id]\ChatSynastryPane.tsx` | 3058 |
-| `src\app\lab\people-pro\[id]\page.tsx` | 7547 |
+| `src\app\lab\people-pro\[id]\page.tsx` | 7188 |
+| `src\app\lab\people-pro\[id]\SynastryPeopleProClient.tsx` | 7558 |
 | `src\app\lab\people-pro\page.tsx` | 1200 |
 | `src\app\lab\transits-pro\ClientTransitsPro.tsx` | 3653 |
 | `src\app\lab\transits-pro\page.tsx` | 5551 |
@@ -72,7 +74,10 @@
 | `src\components\astro\css\proTheme.css` | 1053 |
 | `src\components\astro\DailySkyWheelPro.tsx` | 12760 |
 | `src\components\astro\DailyWheelPro.tsx` | 3231 |
-| `src\components\astro\SynastryWheelPro.tsx` | 13074 |
+| `src\components\astro\labeling.ts` | 1571 |
+| `src\components\astro\proLayout.ts` | 1361 |
+| `src\components\astro\SynastryAspectControls.tsx` | 2367 |
+| `src\components\astro\SynastryWheelPro.tsx` | 17693 |
 | `src\components\astro\TransitsWheelPro.tsx` | 21044 |
 | `src\components\AuthForm.tsx` | 4284 |
 | `src\components\BirthForm.tsx` | 7632 |
@@ -84,7 +89,7 @@
 | `src\components\MonthTransitsList.tsx` | 5335 |
 | `src\components\MoonPhaseCard.tsx` | 1272 |
 | `src\components\PeopleList.tsx` | 2017 |
-| `src\components\PeoplePanel.tsx` | 6162 |
+| `src\components\PeoplePanel.tsx` | 6729 |
 | `src\components\PersonForm.tsx` | 5289 |
 | `src\components\SignOutButton.tsx` | 316 |
 | `src\components\sinastriatest.tsx` | 0 |
