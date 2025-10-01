@@ -2,13 +2,13 @@
 
 | File | Bytes |
 |---|---:|
-| `backups\db-schema.json` | 29861 |
 | `backups\PROJECT_OVERIVIEW_25_9.MD` | 12925 |
 | `backups\PROJECT_OVERVIEW_23_9.md` | 12042 |
 | `backups\PROJECT_OVERVIEW_24_9.md` | 10052 |
-| `backups\PROJECT_OVERVIEW_29_09.md` | 15208 |
 | `backups\PROJECT_OVERVIEW.md` | 3559 |
 | `eslint.config.mjs` | 549 |
+| `kb\db-schema.json` | 29861 |
+| `kb\PROJECT_OVERVIEW_29_09.md` | 15208 |
 | `next-env.d.ts` | 233 |
 | `package-lock.json` | 364283 |
 | `package.json` | 1128 |
@@ -64,8 +64,9 @@
 | `src\app\lab\people-pro\[id]\page.tsx` | 7188 |
 | `src\app\lab\people-pro\[id]\SynastryPeopleProClient.tsx` | 7558 |
 | `src\app\lab\people-pro\page.tsx` | 1200 |
-| `src\app\lab\transits-pro\ClientTransitsPro.tsx` | 3653 |
-| `src\app\lab\transits-pro\page.tsx` | 5551 |
+| `src\app\lab\transits-pro\ClientTransitsPro.tsx` | 5404 |
+| `src\app\lab\transits-pro\page.tsx` | 5757 |
+| `src\app\lab\transits-pro\TransitsProLabClient.tsx` | 3782 |
 | `src\app\layout.tsx` | 1449 |
 | `src\app\onboarding\page.tsx` | 2960 |
 | `src\app\page.tsx` | 1400 |
@@ -77,8 +78,8 @@
 | `src\components\astro\labeling.ts` | 1571 |
 | `src\components\astro\proLayout.ts` | 1361 |
 | `src\components\astro\SynastryAspectControls.tsx` | 2367 |
-| `src\components\astro\SynastryWheelPro.tsx` | 17693 |
-| `src\components\astro\TransitsWheelPro.tsx` | 21044 |
+| `src\components\astro\SynastryWheelPro.tsx` | 20154 |
+| `src\components\astro\TransitsWheelPro.tsx` | 21527 |
 | `src\components\AuthForm.tsx` | 4284 |
 | `src\components\BirthForm.tsx` | 7632 |
 | `src\components\BirthSection.tsx` | 3213 |
@@ -118,7 +119,9 @@
 | `src\lib\synastry\aspects.ts` | 5641 |
 | `src\lib\time.ts` | 617 |
 | `src\lib\time\resolveTz.ts` | 1221 |
+| `src\lib\transitContext.ts` | 2088 |
 | `src\lib\transits.ts` | 5730 |
+| `src\lib\transits\adjacency.ts` | 2122 |
 | `src\lib\utils.ts` | 157 |
 | `src\types\tz-lookup.d.ts` | 107 |
 | `supabase\migrations\0001_init.sql` | 2473 |

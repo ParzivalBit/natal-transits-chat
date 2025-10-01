@@ -98,9 +98,9 @@ export default function SynastryWheelPro({
   const radii = useMemo(() => getProRadii({
     R: r * 0.94,          // manteniamo proporzioni simili al tuo originale
     gap: 0,               // 0 => fasce a filo
-    ringZodiac: 40,
-    ringUserHouses: 36,
-    ringPersonHouses: 36,
+    ringZodiac: 42,
+    ringUserHouses: 43,
+    ringPersonHouses: 44,
     ringAspectogram: r * 0.48, // hub aspetti
     ...radiiOverrides,
   }), [r, radiiOverrides]);
