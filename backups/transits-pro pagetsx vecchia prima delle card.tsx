@@ -1,12 +1,9 @@
 // FILE: src/app/lab/transits-pro/page.tsx
 import { Suspense } from "react";
-import dynamic from "next/dynamic";
 import ClientTransitsPro from "./ClientTransitsPro";
 import { computeDailyPlanets } from "@/lib/planets/runtime";
 import { createSupabaseServerComponentClient } from "@/lib/supabaseServer";
 import { computeHousesForDateUTC } from "@/lib/houses/runtime";
-
-const ChatUI = dynamic(() => import("@/components/ChatUI"), { ssr: false });
 
 type HouseSystem = "placidus" | "whole";
 
@@ -122,17 +119,6 @@ async function loadToday(): Promise<ProPoint[]> {
 }
 
 // ---------------------------
-// Helpers Chat
-// ---------------------------
-function todayUTCISO(): string {
-  const d = new Date();
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-// ---------------------------
 // Page
 // ---------------------------
 export default async function Page({
@@ -153,76 +139,39 @@ export default async function Page({
   const { natal, reason: natalReason } = natalRes;
   const { cusps: houseCusps, systemShown, reason: housesReason } = housesRes;
 
-  // Chat threading & endpoint (adapter B: UI disaccoppiata da runtime/persistenza)
-  const dateUTC = todayUTCISO();
-  const threadKey = `transits:${dateUTC}`;
-  const chatEndpoint = `/api/chat?thread=${encodeURIComponent(threadKey)}&view=transits&date=${encodeURIComponent(
-    dateUTC
-  )}`;
-  const initialContext = `THREAD ${threadKey}\nScope: today's transits (UTC ${dateUTC}).`;
-
   return (
     <Suspense fallback={<div className="p-6 text-sm text-gray-500">Caricamento Transits…</div>}>
-        <div className="w-full min-h-screen">
-          <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="mb-4 text-2xl font-semibold">Transits — Pro</h1>
+      <ClientTransitsPro
+        today={today}
+        natal={natal}
+        houseCusps={houseCusps}
+        houseSystemShown={systemShown ?? undefined}
+      />
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* ---- Card sinistra: grafico (immutato nella logica/stile) ---- */}
-          {/* ---- Card sinistra: grafico (60% dello spazio) ---- */}
-          <div className="lg:col-span-3 rounded-2xl border p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Transits Wheel</h2>
-              <div className="text-sm text-gray-500">{dateUTC}</div>
+      {(natalReason || housesReason) && (
+        <div className="mx-auto mt-4 max-w-5xl px-4 space-y-2">
+          {natalReason === "not_logged" && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              Accedi per vedere i tuoi pianeti natali e le case nella ruota dei transiti.
             </div>
-
-            <ClientTransitsPro
-              today={today}
-              natal={natal}
-              houseCusps={houseCusps}
-              houseSystemShown={systemShown ?? undefined}
-            />
-            {(natalReason || housesReason) && (
-              <div className="mt-4 space-y-2">
-                {natalReason === "not_logged" && (
-                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-                    Accedi per vedere i tuoi pianeti natali e le case nella ruota dei transiti.
-                  </div>
-                )}
-                {natalReason === "no_points" && (
-                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-                    Nessun punto natale trovato in <em>chart_points</em>.
-                  </div>
-                )}
-                {natalReason === "db_error" && (
-                  <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">
-                    Errore nel caricamento dei punti natali. Riprova.
-                  </div>
-                )}
-                {housesReason === "no_birth_data" && (
-                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-                    Dati di nascita mancanti: imposta data/ora/luogo per calcolare le case (di default da{" "}
-                    <code>user_prefs.house_system</code>).
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ---- Card destra: Chat con header sticky e scroll confinato ---- */}
-           <div className="lg:col-span-2 rounded-2xl border p-4 flex flex-col">
-            <div className="sticky top-0 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 z-10 -mx-4 px-4 py-2 border-b">
-              <div className="text-lg font-semibold">Chat — Today’s Transits</div>
-              <div className="text-xs text-gray-500">Thread: {threadKey}</div>
+          )}
+          {natalReason === "no_points" && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              Nessun punto natale trovato in <em>chart_points</em>.
             </div>
-
-            <div className="flex-1 min-h-[60vh] max-h-[75vh] overflow-y-auto">
-              <ChatUI endpoint={chatEndpoint} initialContext={initialContext} />
+          )}
+          {natalReason === "db_error" && (
+            <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">
+              Errore nel caricamento dei punti natali. Riprova.
             </div>
-          </div>
+          )}
+          {housesReason === "no_birth_data" && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              Dati di nascita mancanti: imposta data/ora/luogo per calcolare le case (di default da <code>user_prefs.house_system</code>).
+            </div>
+          )}
         </div>
-      </div>
-      </div>
+      )}
     </Suspense>
   );
 }
